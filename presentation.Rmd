@@ -50,6 +50,11 @@ library(GGally)
 library(car)
 library(FactoMineR)
 library(factoextra)
+library(dplyr)
+library(e1071)
+library(caTools)
+library(class)
+library(pROC)
 ```
 
 #### Loading data-set
@@ -98,7 +103,6 @@ boxplot(raisins$ConvexArea, xlab = "ConvexArea")
 boxplot(raisins$Extent, xlab = "Extent")
 boxplot(raisins$Perimeter, xlab = "Perimeter")
 boxplot(raisins$Class, xlab = "Class")
-
 ```
 
 ### Histograms highlighting class differences
@@ -254,7 +258,7 @@ X = model.matrix(Class~.-1, data = train)
 y=train$Class
 ridge=glmnet(X,y,alpha=0)
 #ridge$beta
-plot(ridge,xvar="lambda", label = TRUE)
+plot(ridge,xvar="lambda", label = TRUE) # Extent(4) and Eccentricity (6) are the variables kept
 ridge_fitted = predict(ridge, newx = X) # fitted value for the training set using the best lambda value automatically selected by the function
 ridge_predicted = predict(ridge, newx = model.matrix(Class~.-1, data = test)) # fitted value for the training set using the best lambda value automatically selected by the function
 cv.ridge=cv.glmnet(X,y,alpha=0)
@@ -306,6 +310,48 @@ tree_predictions = predict(tree, newdata = train[,-8], type = "tree")
 #plot carino
 #valutarlo : prendere predizioni e calcolare mse su training e test
 #confusion matrix
+```
+
+### 7. KNN
+
+```{r, echo=FALSE}
+# Scaling
+train.array <- scale(train[, 1:7])
+test.array<- scale(test[, 1:7])
+# Labels
+training_labels=train$Class
+# KNN Model 
+k_values <- 1:50
+accuracy_scores <- numeric(length(k_values))
+
+for (i in seq_along(k_values)) {
+  #KNN model
+  classifier_knn <- knn(train, test, cl = training_labels, k = k_values[i])
+  
+  # Convert to factors
+  classifier_knn <- as.factor(classifier_knn)
+  actual_labels <- as.factor(test$Class)
+  
+  #Accuracy
+  cm <- confusionMatrix(classifier_knn, actual_labels)
+  accuracy_scores[i] <- cm$overall["Accuracy"]
+}
+
+# Best K value 
+best_k <- k_values[which.max(accuracy_scores)]
+
+#print(paste("Accuracy scores:", accuracy_scores))
+print(paste("Best K value:", best_k))
+
+#Data frame with K values and accuracy
+k_values_results <- data.frame(K = k_values, Accuracy = accuracy_scores)
+# Plot
+ggplot(k_values_results, aes(x = K, y = 1 - Accuracy)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "K", y = "Test Error") +
+  ggtitle("Test Error vs K") +
+  theme_minimal()
 ```
 
 # Unsupervised models
