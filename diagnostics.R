@@ -166,7 +166,7 @@ mse(fit.lasso, raisins, "Class")
 predict(fit.lasso,newx = x)
 
 #### THINGS TO DO #####
-# 1 Fix multicollinearity issues | RIDGE or PCE
 # 2 use the compare_performance() function to compare our models | After fixing multicollinearity
 # 3 visualization of modeel performance through 
 #   plot(compare_performance(ols, robust_ols, logistic, ridge, lasso, rank = TRUE, verbose = FALSE))
+# Apply accuracy to all test errors (Davide's code) and compare the models
