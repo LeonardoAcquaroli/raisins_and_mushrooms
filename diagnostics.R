@@ -14,7 +14,7 @@ library(corrplot)
 library(GGally)
 library(car) 
 library(leaps)
-
+library(bestglm)
 
 # load the dataset
 # Class = 1 if raisin is of Kecimen type, 0 if it is Besni
@@ -28,7 +28,6 @@ raisins <- read.csv(
 # remove the column of the literal class
 raisins_corr <- raisins
 raisins <- raisins[,-8] # Class = 1 if raisin is of Kecimen type, 0 if it is Besni
-
 
 cor_table<-cor(raisins) 
 
@@ -88,11 +87,62 @@ check_model(ols_robust)
 
 
 # LOGISTIC REGRESSION
-logistic <-  glm(Class ~ ., data = raisins, family = binomial(link = 'logit'))
-tidy(logistic)
-vif(logistic)
-hist(fitted(logistic))
-check_model(logistic)
+# Powered by https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4842399/
+
+logistic_model <-  glm(Class ~ ., data = raisins, family = binomial(link = 'logit'))
+tidy(logistic_model)
+vif(logistic_model)
+hist(fitted(logistic_model))
+check_model(logistic_model)
+
+args(bestglm)
+bestglm(raisins, family = gaussian, IC = "BIC")
+imp_logistic_model <- glm(Class ~ Area + ConvexArea + Perimeter, 
+                    data = raisins, 
+                    family = binomial(link = 'logit'))
+vif(imp_logistic_model)
+
+# now for a minimal logistic with no vif issues
+
+minimal1_logistic_model <-  glm(Class ~ Extent + Eccentricity, data = raisins, family = binomial(link = 'logit'))
+vif(minimal1_logistic_model)
+
+minimal2_logistic_model <-  glm(Class ~ Eccentricity + Perimeter, data = raisins,family = binomial(link = 'logit'))
+vif(minimal2_logistic_model)
+
+
+### CHAT GPT WAY ####
+accuracies <- data.frame(Model = character(),
+                         Accuracy = numeric())
+
+models <- list(logistic = logistic_model, 
+               imp_logistic = imp_logistic_model,
+               minimal_logit_extent = minimal1_logistic_model,
+               minimal_logit_perimeter = minimal2_logistic_model)
+
+for (model_name in names(models)) {
+  model <- models[[model_name]]
+  
+  # Predict the outcome probabilities using the logistic regression model
+  pred_pr <- predict(model, raisins, type = "response")
+  
+  # Convert the predicted probabilities to binary predictions (0 or 1)
+  pred_val <- ifelse(pred_pr > 0.5, 1, 0)
+  
+  # Compare the predicted values with the actual outcome variable
+  actual_values <- raisins$Class
+  
+  # Compute the number of correctly predicted values
+  correctly_pred <- sum(pred_val == actual_values)
+  
+  # Compute the percentage of correctly predicted values
+  accuracy <- correctly_pred / length(actual_values) * 100
+  
+  # Append the accuracy to the "accuracies" data frame
+  accuracies <- rbind(accuracies, data.frame(Model = model_name, Accuracy = accuracy))
+}
+
+accuracies
 
 # 4. RIDGE
 x = model.matrix(Class~.-1, data = raisins)
@@ -114,8 +164,6 @@ plot(cv.lasso)
 coef(cv.lasso)
 mse(fit.lasso, raisins, "Class")
 predict(fit.lasso,newx = x)
-
-print("Hello")
 
 #### THINGS TO DO #####
 # 1 Fix multicollinearity issues | RIDGE or PCE
