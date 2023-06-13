@@ -8,7 +8,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
 # Description
@@ -62,10 +62,7 @@ raisins = read.csv(
   sep = ";"
 )
 
-raisins
-
-table(raisins$Class_literal)
-summary(raisins)
+head(raisins)
 
 # remove the Class_literal  column  
 raisins_corr <- raisins
@@ -93,20 +90,20 @@ ggpairs(raisins_corr, columns = 1:6, ggplot2::aes(colour= Class_literal)) #cor b
 (Aim: Identify outliers)
 
 ```{r, echo=FALSE}
-boxplot(raisins$Area)
-boxplot(raisins$MajorAxisLength)
-boxplot(raisins$MinorAxisLength)
-boxplot(raisins$Eccentricity)
-boxplot(raisins$ConvexArea)
-boxplot(raisins$Extent)
-boxplot(raisins$Perimeter)
-boxplot(raisins$Class)
+boxplot(raisins$Area, xlab = "Area")
+boxplot(raisins$MajorAxisLength, xlab = "MajorAxisLength")
+boxplot(raisins$MinorAxisLength, xlab = "MinorAxisLength")
+boxplot(raisins$Eccentricity, xlab = "Eccentricity")
+boxplot(raisins$ConvexArea, xlab = "ConvexArea")
+boxplot(raisins$Extent, xlab = "Extent")
+boxplot(raisins$Perimeter, xlab = "Perimeter")
+boxplot(raisins$Class, xlab = "Class")
 
 ```
 
 ### Histograms highlighting class differences
 
-(Aim:See more clearly if variables' distribution depend on Class)
+(Aim: See more clearly if variables' distribution depend on Class)
 
 ```{r}
 library(ggthemes)
@@ -239,20 +236,14 @@ mse(ols_robust_test_predictions, test, "Class") #test error
 ```{r}
 library(broom)
 
-# Fit the logistic regression model
+# 3. Logistic
 logistic = glm(Class ~ ., data = train, family = binomial(link = 'logit'))
-# Extract tidy coefficients
-tidy_output <- tidy(logistic)
-tidy_output
-
-# Histogram of the fitted values
+tidy(logistic)
 hist(fitted(logistic))
-# Predictions on the test data
+#logistic by hand
 logistic_test_predictions = predict(logistic, newdata = test)
-# Calculate MSE for the training data
-print(mse(fitted(logistic), train, "Class"))
-# Calculate MSE for the test data
-print(mse(logistic_test_predictions, test, "Class"))
+mse(fitted(logistic), train, "Class")
+mse(logistic_test_predictions, test, "Class")
 ```
 
 ### 4. RIDGE
@@ -288,10 +279,10 @@ cv.lasso=cv.glmnet(X,y)
 plot(cv.lasso)
 coef(cv.lasso)
 # Calculate mean squared error for the training data
-mse(fit.lasso, raisins, "Class")
-#Predict using the lasso regression model
-predict(fit.lasso,newx = X)
-
+#mse(fit.lasso, raisins, "Class")
+##Predict using the lasso regression model
+#predict(fit.lasso,newx = X)
+#
 ```
 
 ### 6. TREE
@@ -310,7 +301,7 @@ tree_test_predictions = predict(tree, newdata = test, type = "tree")
 tree_predictions = predict(tree, newdata = train[,-8], type = "tree")
 
 # Calculate mean squared error for the test data
-mse(tree_test_predictions, test, "Class")
+#mse(tree_test_predictions, test, "Class")
 
 #plot carino
 #valutarlo : prendere predizioni e calcolare mse su training e test
