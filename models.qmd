@@ -1,0 +1,57 @@
+---
+title: "Raisins"
+author: "Casual Deep Learning"
+format: revealjs
+editor: visual
+---
+
+## Description
+
+Raisins can be of two species: *Kecimen* and *Besni*.\
+We built different models to predict the species on the basis of the dimensions of the raisin example approximated as an ellipse.
+
+## Variables
+
+The predictors that can be used are:
+
+-   Area	MajorAxisLength
+-   MinorAxisLength
+-   Eccentricity
+-   ConvexArea
+-   Extent
+-   Perimeter
+-   Class_literal
+
+## Supervised models
+
+#### Setup
+
+```         
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(estimatr)
+library(stats)
+library(tree)
+library(maxLik)
+library(Matrix)
+library(caret)
+
+# load the dataset
+# Class = 1 if raisin is of Kecimen type, 0 if it is Besni
+raisins = read.csv(
+  "https://raw.githubusercontent.com/LeonardoAcquaroli/raisins_and_mushrooms/main/datasets/Raisin_Dataset.csv",
+  sep = ";"
+)
+# remove the column of the literal class
+#raisins = raisins %>% select(-Class_literal) # don't know why it doesn't work
+raisins = raisins[,-8]
+set.seed(42)
+training_index = createDataPartition(raisins$Class, p=0.7, list = FALSE) # index of the train set examples
+train = raisins[training_index,]
+test = raisins[-training_index,]
+```

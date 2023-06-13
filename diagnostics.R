@@ -12,7 +12,9 @@ library(performance)
 library(see)
 library(corrplot)
 library(GGally)
-library(car)
+library(car) 
+library(leaps)
+
 
 # load the dataset
 # Class = 1 if raisin is of Kecimen type, 0 if it is Besni
@@ -39,6 +41,9 @@ ggpairs(raisins_corr, columns = 1:6, ggplot2::aes(colour= Class_literal)) #cor b
 
 ########### OLS REGRESSION ####################
 ols <- lm("Class ~ .",data=raisins)
+ols2 <-  lm("Class ~ Eccentricity + Perimeter", data = raisins)
+summary(ols2)
+vif(ols2)
 summary(ols)
 hist(fitted(ols))
 #check heteroskedasticity
@@ -47,18 +52,51 @@ check_model(ols)
 vif(ols) #uupsie
 sqrt(vif(ols)) > 2 # uupsieee x2
 
+# Deal with correlation by using best subset selection
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=7)
+reg.summary=summary(regfit.full)
+names(reg.summary) 
+plot(reg.summary$cp,xlab="Number of Variables",ylab="Cp")
+which.min(reg.summary$cp)
+plot(regfit.full,scale="Cp")
+
+# run the OLS again
+
+ols_imp <- lm("Class ~ Area + MajorAxisLength + 
+              Eccentricity + ConvexArea + Perimeter",data=raisins)
+summary(ols_imp)
+vif(ols_imp) # the VIF is still too high!
+sqrt(vif(ols_imp)) > 2
+
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=4)
+reg.summary=summary(regfit.full)
+plot(regfit.full,scale="Cp")
+
+ols_imp2 <- lm("Class ~ Eccentricity + Perimeter",data=raisins)
+summary(ols_imp2)
+vif(ols_imp2) # the VIF is still too high!
+sqrt(vif(ols_imp2)) > 2
+
+check_model(ols_imp2)
+plot(ols_imp2)
+
 #ROBUST OLS
-ols_robust <- lm_robust(Class ~ ., data = raisins, se_type = "HC2")
+ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
+summary(ols_robust)
 check_model(ols_robust)
+
+
 
 # LOGISTIC REGRESSION
 logistic <-  glm(Class ~ ., data = raisins, family = binomial(link = 'logit'))
 tidy(logistic)
+vif(logistic)
 hist(fitted(logistic))
 check_model(logistic)
 
 # 4. RIDGE
 x = model.matrix(Class~.-1, data = raisins)
+x
 y=raisins$Class
 fit.ridge=glmnet(x,y,alpha=0)
 fit.ridge$beta
@@ -80,7 +118,7 @@ predict(fit.lasso,newx = x)
 print("Hello")
 
 #### THINGS TO DO #####
-# 1 Fix multicollinearity issues
-# 2 use the compare_performance() function to compare our models
+# 1 Fix multicollinearity issues | RIDGE or PCE
+# 2 use the compare_performance() function to compare our models | After fixing multicollinearity
 # 3 visualization of modeel performance through 
 #   plot(compare_performance(ols, robust_ols, logistic, ridge, lasso, rank = TRUE, verbose = FALSE))
