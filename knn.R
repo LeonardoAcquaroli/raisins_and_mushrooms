@@ -68,7 +68,7 @@ classifier_knn <- knn(train,
                       k = 5)
 classifier_knn
 
-# Confusiin Matrix
+# Confusion Matrix
 cm <- table(test$Class, classifier_knn)
 cm
 

@@ -77,17 +77,20 @@ confusionMatrix(as.factor(logistic_classification_test), as.factor(test$Class))
 
 
 # 4. Ridge
-x = model.matrix(Class~.-1, data = train)
-x
+X = model.matrix(Class~.-1, data = train)
 y=train$Class
-
-fit.ridge=glmnet(x,y,alpha=0)
-fit.ridge$beta
-plot(fit.ridge,xvar="lambda", label = TRUE)
-cv.ridge=cv.glmnet(x,y,alpha=0)
-plot(cv.ridge)
+ridge=glmnet(X,y,alpha=0)
+ridge$beta
+plot(ridge,xvar="lambda", label = TRUE)
+ridge_fitted = predict(ridge, newx = X) # fitted value for the training set using the best lambda value automatically selected by the function
+ridge_predicted = predict(ridge, newx = model.matrix(Class~.-1, data = test)) # fitted value for the training set using the best lambda value automatically selected by the function
+cv.ridge=cv.glmnet(X,y,alpha=0)
 coef(cv.ridge)
-mse(fitted(fit.ridge), train, "Class")
+plot(cv.ridge) # cv mse of the ridge
+cv.ridge_predicted = predict(cv.ridge, newx = X)
+mse(ridge_fitted, train, "Class") # training error of the ridge
+mse(ridge_predicted, test, "Class") # test error of the ridge
+mse(cv.ridge_predicted, test, "Class") # cv test error of the ridge
 
 # 5. Lasso
 fit.lasso=glmnet(x,y)
