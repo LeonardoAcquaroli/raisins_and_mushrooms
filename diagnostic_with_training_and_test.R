@@ -14,7 +14,7 @@ library(corrplot)
 library(GGally)
 library(car) 
 library(leaps)
-library(bestglm)
+
 
 # load the dataset
 # Class = 1 if raisin is of Kecimen type, 0 if it is Besni
@@ -23,11 +23,25 @@ raisins <- read.csv(
   sep = ";"
 )
 
+
+
 # Here I'll do the correlations plots as well
 
 # remove the column of the literal class
 raisins_corr <- raisins
 raisins <- raisins[,-8] # Class = 1 if raisin is of Kecimen type, 0 if it is Besni
+head(raisins)
+
+
+
+set.seed(2)
+sample <- sample(c(TRUE, FALSE), nrow(raisins), replace=TRUE, prob=c(0.7,0.3))
+train  <- raisins[sample, ]
+test   <- raisins[!sample, ]
+
+
+
+
 
 cor_table<-cor(raisins) 
 
@@ -36,11 +50,11 @@ corrplot(cor_table, type = "upper",     #first corr plot
 
 ggcorr(raisins, method = c("everything", "pearson")) #heatmap plot
 
-ggpairs(raisins_corr, columns = 1:6, ggplot2::aes(colour= Class_literal)) #cor by groups
+ggpairs(raisins_corr, columns = 1:6, ggplot2::aes(colour= Class_literal, alpha = 0.000001)) #cor by groups
 
 ########### OLS REGRESSION ####################
-ols <- lm("Class ~ .",data=raisins)
-ols2 <-  lm("Class ~ Eccentricity + Perimeter", data = raisins)
+ols <- lm("Class ~ .",data=train)
+ols2 <-  lm("Class ~ Eccentricity + Perimeter", data = train)
 summary(ols2)
 vif(ols2)
 summary(ols)
@@ -52,7 +66,7 @@ vif(ols) #uupsie
 sqrt(vif(ols)) > 2 # uupsieee x2
 
 # Deal with correlation by using best subset selection
-regfit.full=regsubsets(Class ~.,data=raisins, nvmax=7)
+regfit.full=regsubsets(Class ~.,data=train, nvmax=7)
 reg.summary=summary(regfit.full)
 names(reg.summary) 
 plot(reg.summary$cp,xlab="Number of Variables",ylab="Cp")
@@ -67,11 +81,11 @@ summary(ols_imp)
 vif(ols_imp) # the VIF is still too high!
 sqrt(vif(ols_imp)) > 2
 
-regfit.full=regsubsets(Class ~.,data=raisins, nvmax=4)
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=7)
 reg.summary=summary(regfit.full)
 plot(regfit.full,scale="Cp")
 
-ols_imp2 <- lm("Class ~ Eccentricity + Perimeter",data=raisins)
+ols_imp2 <- lm("Class ~ Eccentricity + Perimeter",data=train)
 summary(ols_imp2)
 vif(ols_imp2) # the VIF is still too high!
 sqrt(vif(ols_imp2)) > 2
@@ -79,70 +93,75 @@ sqrt(vif(ols_imp2)) > 2
 check_model(ols_imp2)
 plot(ols_imp2)
 
+# ols test set
+
+
+fitvols = predict(ols2, test)
+fitvols
+
+
+predols = ifelse(fitvols < 0.50, 0, 1)
+predols 
+
+accols = test$Class == predols
+table(accols)
+
+
+
+
+
 #ROBUST OLS
-ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
+ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = train, se_type = "HC2")
 summary(ols_robust)
 check_model(ols_robust)
 
 
+fitvrob = predict(ols_robust, test)
+fitvrob
+
+
+predrob = ifelse(fitvrob < 0.50, 0, 1)
+predrob 
+
+accrob = test$Class == predrob
+table(accrob) 
+
+
+
+
+
+
+
+
+
+
+
+
 
 # LOGISTIC REGRESSION
-# Powered by https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4842399/
-
-logistic_model <-  glm(Class ~ ., data = raisins, family = binomial(link = 'logit'))
-tidy(logistic_model)
-vif(logistic_model)
-hist(fitted(logistic_model))
-check_model(logistic_model)
-
-args(bestglm)
-bestglm(raisins, family = gaussian, IC = "BIC")
-imp_logistic_model <- glm(Class ~ Area + ConvexArea + Perimeter, 
-                    data = raisins, 
-                    family = binomial(link = 'logit'))
-vif(imp_logistic_model)
-
-# now for a minimal logistic with no vif issues
-
-minimal1_logistic_model <-  glm(Class ~ Extent + Eccentricity, data = raisins, family = binomial(link = 'logit'))
-vif(minimal1_logistic_model)
-
-minimal2_logistic_model <-  glm(Class ~ Eccentricity + Perimeter, data = raisins,family = binomial(link = 'logit'))
-vif(minimal2_logistic_model)
+logistic <-  glm(Class ~ ., data = train, family = binomial(link = 'logit'))
+tidy(logistic)
+vif(logistic)
+hist(fitted(logistic))
+check_model(logistic)
 
 
-### CHAT GPT WAY ####
-accuracies <- data.frame(Model = character(),
-                         Accuracy = numeric())
 
-models <- list(logistic = logistic_model, 
-               imp_logistic = imp_logistic_model,
-               minimal_logit_extent = minimal1_logistic_model,
-               minimal_logit_perimeter = minimal2_logistic_model)
 
-for (model_name in names(models)) {
-  model <- models[[model_name]]
-  
-  # Predict the outcome probabilities using the logistic regression model
-  pred_pr <- predict(model, raisins, type = "response")
-  
-  # Convert the predicted probabilities to binary predictions (0 or 1)
-  pred_val <- ifelse(pred_pr > 0.5, 1, 0)
-  
-  # Compare the predicted values with the actual outcome variable
-  actual_values <- raisins$Class
-  
-  # Compute the number of correctly predicted values
-  correctly_pred <- sum(pred_val == actual_values)
-  
-  # Compute the percentage of correctly predicted values
-  accuracy <- correctly_pred / length(actual_values) * 100
-  
-  # Append the accuracy to the "accuracies" data frame
-  accuracies <- rbind(accuracies, data.frame(Model = model_name, Accuracy = accuracy))
-}
+fitvlog = predict(logistic, test)
+fitvlog
 
-accuracies
+
+predlog = ifelse(fitvlog < 0.50, 0, 1)
+predlog 
+
+acclog = test$Class == predlog
+table(acclog) 
+
+
+
+
+
 
 # 4. RIDGE
 x = model.matrix(Class~.-1, data = raisins)
@@ -156,6 +175,10 @@ plot(cv.ridge)
 coef(cv.ridge)
 mse(fitted(fit.ridge), raisins, "Class")
 
+
+
+
+
 # 5. LASSO
 fit.lasso=glmnet(x,y)
 plot(fit.lasso,xvar="lambda",label=TRUE)
@@ -165,8 +188,10 @@ coef(cv.lasso)
 mse(fit.lasso, raisins, "Class")
 predict(fit.lasso,newx = x)
 
+print("Hello")
+
 #### THINGS TO DO #####
+# 1 Fix multicollinearity issues | RIDGE or PCE
 # 2 use the compare_performance() function to compare our models | After fixing multicollinearity
 # 3 visualization of modeel performance through 
 #   plot(compare_performance(ols, robust_ols, logistic, ridge, lasso, rank = TRUE, verbose = FALSE))
-# Apply accuracy to all test errors (Davide's code) and compare the models
