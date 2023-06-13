@@ -53,11 +53,28 @@ mse(ols_robust_test_predictions, test, "Class") #test error
 # 3. Logistic
 logistic = glm(Class ~ ., data = train, family = binomial(link = 'logit'))
 tidy(logistic)
+logistic_fitted = fitted(logistic)
+logistic_predicted = predict(logistic, newdata = test)
+
+ggplot() +
+  geom_histogram(mapping = aes(x = logistic_fitted), binwidth = 0.5, color = 'black', fill = 'blue', alpha = 0.4) +
+  geom_histogram(mapping = aes(x = logistic_predicted), binwidth = 0.5, color = 'black', fill = 'red', alpha = 0.4)
+  
 hist(fitted(logistic))
 #logistic by hand
-logistic_test_predictions = predict(logistic, newdata = test)
 mse(fitted(logistic), train, "Class")
-mse(logistic_test_predictions, test, "Class")
+mse(logistic_predicted, test, "Class")
+
+# CONFUSION MATRIX
+logistic_classification_train <- ifelse(logistic_fitted > 0.5, 1, 0)
+logistic_classification_test <- ifelse(logistic_predicted > 0.5, 1, 0)
+# Alternative way
+## train
+confusionMatrix(as.factor(logistic_classification_train), as.factor(train$Class))
+
+## test
+confusionMatrix(as.factor(logistic_classification_test), as.factor(test$Class))
+
 
 # 4. Ridge
 x = model.matrix(Class~.-1, data = train)
