@@ -115,6 +115,7 @@ coef(cv.lasso)
 mse(fit.lasso, raisins, "Class")
 predict(fit.lasso,newx = x)
 
+print("Hello")
 
 #### THINGS TO DO #####
 # 1 Fix multicollinearity issues | RIDGE or PCE
