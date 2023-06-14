@@ -8,13 +8,17 @@ library(tree)
 library(maxLik)
 library(Matrix)
 library(caret)
-library(performance)
-library(see)
-library(corrplot)
-library(GGally)
-library(car) 
-library(leaps)
-library(bestglm)
+library(performance) # evaluating models
+library(see)         # evaluating models
+library(corrplot)# correlation plot 
+library(GGally)  # correlation plot  
+library(car)    
+library(leaps)   # best subset
+library(bestglm) # best subset for logistic
+library(MASS)    # diagnostics
+library(olsrr)   # diagnostics
+library(influence.ME)
+library(DHARMa)
 
 # load the dataset
 # Class = 1 if raisin is of Kecimen type, 0 if it is Besni
@@ -40,9 +44,6 @@ ggpairs(raisins_corr, columns = 1:6, ggplot2::aes(colour= Class_literal)) #cor b
 
 ########### OLS REGRESSION ####################
 ols <- lm("Class ~ .",data=raisins)
-ols2 <-  lm("Class ~ Eccentricity + Perimeter", data = raisins)
-summary(ols2)
-vif(ols2)
 summary(ols)
 hist(fitted(ols))
 #check heteroskedasticity
@@ -73,11 +74,31 @@ plot(regfit.full,scale="Cp")
 
 ols_imp2 <- lm("Class ~ Eccentricity + Perimeter",data=raisins)
 summary(ols_imp2)
-vif(ols_imp2) # the VIF is still too high!
+vif(ols_imp2)
 sqrt(vif(ols_imp2)) > 2
 
 check_model(ols_imp2)
 plot(ols_imp2)
+
+# ols_imp2 is our final model as far as linear regressions goes. 
+# let's apply further diagnostics
+
+raw_res <- residuals(ols_imp2)
+threshold <- 2 * sd(raw_res)  # Define threshold as 2 times the SD
+threshold# how are the residuals distributed?
+hist(raw_res, breaks = 30, main = "Histogram of Raw Residuals", xlab = "Raw Residuals")
+
+#cook's distance
+cooks_dist <- cooks.distance(ols_imp2)
+cooks_threshold <- 4/897
+plot(cooks_dist, raw_res, main = "Cook's Distance vs. Raw Residuals",
+     xlab = "Cook's Distance", ylab = "Raw Residuals")
+abline(h = 0, lty = 2, col = "red")  # Reference line at y = 0
+abline(h = threshold, lty = 3, col = "blue")  # Threshold line for raw residuals (upper)
+abline(h = -threshold, lty = 3, col = "blue")  # Threshold line for raw residuals (lower)
+abline(v = cooks_threshold, lty = 3, col = "green")
+text(cooks_dist, raw_res, labels = 1:length(cooks_dist), pos = 3)
+# wow there are a lot of outliers
 
 #ROBUST OLS
 ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
@@ -93,7 +114,7 @@ logistic_model <-  glm(Class ~ ., data = raisins, family = binomial(link = 'logi
 tidy(logistic_model)
 vif(logistic_model)
 hist(fitted(logistic_model))
-check_model(logistic_model)
+
 
 args(bestglm)
 bestglm(raisins, family = gaussian, IC = "BIC")
@@ -111,7 +132,7 @@ minimal2_logistic_model <-  glm(Class ~ Eccentricity + Perimeter, data = raisins
 vif(minimal2_logistic_model)
 
 
-### CHAT GPT WAY ####
+# create a table of the accuracies
 accuracies <- data.frame(Model = character(),
                          Accuracy = numeric())
 
@@ -125,26 +146,48 @@ for (model_name in names(models)) {
   
   # Predict the outcome probabilities using the logistic regression model
   pred_pr <- predict(model, raisins, type = "response")
-  
   # Convert the predicted probabilities to binary predictions (0 or 1)
   pred_val <- ifelse(pred_pr > 0.5, 1, 0)
-  
   # Compare the predicted values with the actual outcome variable
   actual_values <- raisins$Class
-  
   # Compute the number of correctly predicted values
   correctly_pred <- sum(pred_val == actual_values)
-  
   # Compute the percentage of correctly predicted values
   accuracy <- correctly_pred / length(actual_values) * 100
-  
   # Append the accuracy to the "accuracies" data frame
   accuracies <- rbind(accuracies, data.frame(Model = model_name, Accuracy = accuracy))
 }
 
 accuracies
 
-# 4. RIDGE
+# we take "minimal_logit_perimeter" as the best one. 
+# we compute additional diagnostics
+
+predicted_probs_logit <- predict(minimal2_logistic_model, type = "response")
+residuals_logit <- raisins$Class - predicted_probs_logit
+
+plot(predicted_probs_logit, raisins$Class, xlab = "Predicted Probabilities", ylab = "Observed Responses",
+     main = "Observed vs. Predicted Probabilities", pch = 16)
+
+#check relations with each predictor
+plot(raisins$Eccentricity, residuals_logit, xlab = "Eccentricity", ylab = "Standardized Residuals",
+     main = "Standardized Residuals vs. Predictor 1", pch = 16)
+plot(raisins$Perimeter, residuals_logit, xlab = "Perimeter", ylab = "Standardized Residuals",
+     main = "Standardized Residuals vs. Predictor 1", pch = 16)
+
+# Diagnostics with DHARMa
+
+# Create a simulated residuals object
+simulated_residuals <- simulateResiduals(model, n = 100)
+# Plot standardized residuals using DHARMa's built-in diagnostic plots
+plot(simulated_residuals)
+
+# Compare all the models
+compare_performance(ols_imp2, ols_robust, minimal2_logistic_model)
+plot(compare_performance(ols_imp2, minimal2_logistic_model, rank = TRUE, verbose = FALSE))
+
+
+# 4. RIDGE # I didn't check this parts though
 x = model.matrix(Class~.-1, data = raisins)
 x
 y=raisins$Class
@@ -166,7 +209,7 @@ mse(fit.lasso, raisins, "Class")
 predict(fit.lasso,newx = x)
 
 #### THINGS TO DO #####
-# 2 use the compare_performance() function to compare our models | After fixing multicollinearity
-# 3 visualization of modeel performance through 
-#   plot(compare_performance(ols, robust_ols, logistic, ridge, lasso, rank = TRUE, verbose = FALSE))
-# Apply accuracy to all test errors (Davide's code) and compare the models
+# Add accuracy of LPM, Lasso, Ridge
+# Add to performance comparison Lasso and Ridge
+# Add to performance comparison plot Lasso and Ridge
+
