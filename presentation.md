@@ -18,7 +18,8 @@ We built different models to predict the species on the basis of the dimensions 
 
 The predictors that can be used are:
 
--   Area MajorAxisLength
+-   Area 
+-   MajorAxisLength
 -   MinorAxisLength
 -   Eccentricity
 -   ConvexArea
