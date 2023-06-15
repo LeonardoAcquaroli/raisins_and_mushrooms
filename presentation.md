@@ -11,21 +11,23 @@ output:
 
 # Description
 
-Raisins can be of two species: *Kecimen* and *Besni*.\
-We built different models to predict the species on the basis of the dimensions of the raisin example approximated as an ellipse.
+Raisins can be of two species: *Kecimen* *(Class = 1)* and *Besni (Class = 0)*.\
+We built different models to predict the species on the basis of the dimensions of the raisin example approximated as an ellipse.\
+Data are taken from the paper: <https://dergipark.org.tr/tr/download/article-file/1227592> and are available at: <https://www.kaggle.com/datasets/muratkokludataset/raisin-dataset>
 
 ## Variables
 
 The predictors that can be used are:
 
--   Area 
+-   Area
 -   MajorAxisLength
 -   MinorAxisLength
 -   Eccentricity
 -   ConvexArea
 -   Extent
 -   Perimeter
--   Class_literal
+
+The target variable is [Class.]{.underline}
 
 # Descriptive Analysis
 
@@ -106,13 +108,80 @@ raisins <- raisins[,-8]
 
 (Aim: visually represent relationships between variables)
 
-![](presentation_files/figure-html/unnamed-chunk-3-1.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-3-2.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-3-3.png)<!-- -->
+
+```r
+cor_table<-cor(raisins) 
+
+corrplot(cor_table, type = "upper",     #first corr plot
+         tl.col = "black", tl.srt = 45)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
+
+```r
+ggcorr(raisins, method = c("everything", "pearson")) #heatmap plot
+```
+
+![](presentation_files/figure-html/unnamed-chunk-3-2.png)<!-- -->
+
+```r
+ggpairs(raisins_corr, columns = 1:7, ggplot2::aes(colour= Class_literal, alpha = 0.005)) #cor by groups
+```
+
+![](presentation_files/figure-html/unnamed-chunk-3-3.png)<!-- -->
 
 ### Boxplot
 
 (Aim: Identify outliers)
 
-![](presentation_files/figure-html/unnamed-chunk-4-1.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-2.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-3.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-4.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-5.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-6.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-7.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-8.png)<!-- -->
+
+```r
+boxplot(raisins$Area, xlab = "Area")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-4-1.png)<!-- -->
+
+```r
+boxplot(raisins$MajorAxisLength, xlab = "MajorAxisLength")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-4-2.png)<!-- -->
+
+```r
+boxplot(raisins$MinorAxisLength, xlab = "MinorAxisLength")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-4-3.png)<!-- -->
+
+```r
+boxplot(raisins$Eccentricity, xlab = "Eccentricity")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-4-4.png)<!-- -->
+
+```r
+boxplot(raisins$ConvexArea, xlab = "ConvexArea")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-4-5.png)<!-- -->
+
+```r
+boxplot(raisins$Extent, xlab = "Extent")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-4-6.png)<!-- -->
+
+```r
+boxplot(raisins$Perimeter, xlab = "Perimeter")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-4-7.png)<!-- -->
+
+```r
+boxplot(raisins$Class, xlab = "Class")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-4-8.png)<!-- -->
 
 ### Histograms highlighting class differences
 
@@ -125,13 +194,81 @@ library(ggthemes)
 
 Black: Kecimen, Yellow: Besni
 
-![](presentation_files/figure-html/unnamed-chunk-6-1.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-2.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-3.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-4.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-5.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-6.png)<!-- -->
+
+```r
+theme_set(theme_economist())
+
+ggplot() +
+geom_histogram(data = subset(x=raisins, subset=Class==1), 
+               aes(x = Area), fill = 'black', alpha = 0.5) +
+geom_histogram(data = subset(x=raisins, subset=Class==0), 
+                 aes(x = Area), fill='yellow', alpha = 0.5) +
+ggtitle(paste0("Comparison between Area's distribution" )) 
+```
+
+![](presentation_files/figure-html/unnamed-chunk-6-1.png)<!-- -->
+
+```r
+ggplot() + 
+geom_histogram(data = subset(x=raisins, subset=Class==1), 
+               aes(x = MinorAxisLength), fill = 'black', alpha = 0.5) + 
+geom_histogram(data = subset(x=raisins, subset=Class==0), 
+               aes(x = MinorAxisLength), fill='yellow', alpha = 0.5) +
+ggtitle(paste0("Comparison between MinorAxisLength's distribution" )) 
+```
+
+![](presentation_files/figure-html/unnamed-chunk-6-2.png)<!-- -->
+
+```r
+ggplot() + 
+geom_histogram(data = subset(x=raisins, subset=Class==1), 
+               aes(x = Eccentricity), fill = 'black', alpha = 0.5) + 
+geom_histogram(data = subset(x=raisins, subset=Class==0), 
+               aes(x = Eccentricity), fill='yellow', alpha = 0.5) +
+ggtitle(paste0("Comparison between Eccentricity's distribution" )) 
+```
+
+![](presentation_files/figure-html/unnamed-chunk-6-3.png)<!-- -->
+
+```r
+ggplot() + 
+geom_histogram(data = subset(x=raisins, subset=Class==1), 
+               aes(x = ConvexArea), fill = 'black', alpha = 0.5) + 
+geom_histogram(data = subset(x=raisins, subset=Class==0), 
+               aes(x = ConvexArea), fill='yellow', alpha = 0.5) +
+ggtitle(paste0("Comparison between ConvexArea's distribution" )) 
+```
+
+![](presentation_files/figure-html/unnamed-chunk-6-4.png)<!-- -->
+
+```r
+ggplot() + 
+geom_histogram(data = subset(x=raisins, subset=Class==1), 
+               aes(x = Extent), fill = 'black', alpha = 0.5) + 
+geom_histogram(data = subset(x=raisins, subset=Class==0), 
+               aes(x = Extent), fill='yellow', alpha = 0.5) +
+ggtitle(paste0("Comparison between Extent's distribution" ))
+```
+
+![](presentation_files/figure-html/unnamed-chunk-6-5.png)<!-- -->
+
+```r
+ggplot() + 
+geom_histogram(data = subset(x=raisins, subset=Class==1), 
+               aes(x = Perimeter), fill = 'black', alpha = 0.5) + 
+geom_histogram(data = subset(x=raisins, subset=Class==0), 
+               aes(x = Perimeter), fill='yellow', alpha = 0.5) +
+ggtitle(paste0("Comparison between Perimeter's distribution" ))
+```
+
+![](presentation_files/figure-html/unnamed-chunk-6-6.png)<!-- -->
 
 # Supervised models
 
 ## We first use all the dataset
 
 #### We run a basic ols model, which would be a linear probability model
+
 
 ```r
 ols <- lm("Class ~ .",data=raisins)
@@ -165,7 +302,8 @@ summary(ols)
 ## F-statistic: 133.8 on 7 and 892 DF,  p-value: < 2.2e-16
 ```
 
-#### We check for heteroskedasticity and multicollinearity
+#### We check for heteroscedasticity and multicollinearity
+
 
 ```r
 check_heteroscedasticity(ols) # there is heteroskedasticity
@@ -202,9 +340,11 @@ sqrt(vif(ols)) > 2
 ##          Extent       Perimeter 
 ##           FALSE            TRUE
 ```
-#### There appears to be heteroskedacity, plus the multicollinearity is extremely high
+
+#### There appears to be heteroscedacity, plus the multicollinearity is extremely high
 
 #### We try to tackle multicollinearity by reducing the variables in the model. We use best subset selection.
+
 
 ```r
 regfit.full=regsubsets(Class ~.,data=raisins, nvmax=7)
@@ -229,6 +369,7 @@ plot(regfit.full,scale="Cp")
 <img src="presentation_files/figure-html/unnamed-chunk-9-2.png" style="display: block; margin: auto;" />
 
 #### As we can see, the best model appears to be one with 5 variables. We run this improved ols model
+
 
 ```r
 ols_imp <- lm("Class ~ Area + MajorAxisLength + 
@@ -270,9 +411,13 @@ vif(ols_imp) # the VIF is still too high!
 ##            Area MajorAxisLength    Eccentricity      ConvexArea       Perimeter 
 ##      209.089582       65.482372        4.124587      362.380343       94.243582
 ```
-#### the VIF is extremely high. 
-### Given that most of our variables are highly correlated, we identify three "proper" dimensions over which our data span.
+
+#### the VIF is extremely high.
+
+#### Given that most of our variables are highly correlated, we identify three "proper" dimensions over which our data span.
+
 #### Thus, we perform best subset selection specifying that we want at most 3 variables
+
 
 ```r
 regfit.full=regsubsets(Class ~.,data=raisins, nvmax=3)
@@ -365,6 +510,7 @@ text(cooks_dist, raw_res, labels = 1:length(cooks_dist), pos = 3)
 
 #### The most problematic observations appear to be: 695, 507, 837, 291, 86, 488. We should dig deeper into them.
 
+
 ```r
 outliers_obs <- c(695, 507, 837, 291, 86, 488)
 outliers_df <- raisins[outliers_obs, ]
@@ -398,9 +544,7 @@ print(p)
 
 <img src="presentation_files/figure-html/unnamed-chunk-15-1.png" style="display: block; margin: auto;" />
 
-#### These observations clearly have a very large "Perimeter", however they do not appear to be completely wrong.<br> We can still try to remove them and see how the performance changes. <br> We now plot the accuracy of our model on the whole dataset
-
-
+#### These observations clearly have a very large "Perimeter", however they do not appear to be completely out of this world. <br> We can still try to remove them and see how the performance changes. <br> We now plot the accuracy of our model on the whole dataset
 
 
 ```r
@@ -426,7 +570,7 @@ accuracy_ols_fulld
 ## [1] 0.8622222
 ```
 
-#### Given that we found heteroskedasticity, we perform the same model with the robust option.
+#### Given that we found heteroscedasticity, we perform the same model with the robust option.
 
 
 ```r
@@ -452,7 +596,9 @@ summary(ols_robust)
 ## Multiple R-squared:  0.4681 ,	Adjusted R-squared:  0.4669 
 ## F-statistic: 251.8 on 2 and 897 DF,  p-value: < 2.2e-16
 ```
+
 #### We compute the accuracy as we did before
+
 
 ```r
 fitvolsrob_fulld = predict(ols_robust, raisins) # fulld identifies the full dataset
@@ -475,6 +621,7 @@ accuracy_olsrob_fulld
 ```
 ## [1] 0.8622222
 ```
+
 #### We now remove the "outliers" from the dataset and preform the very same models.
 
 
@@ -483,6 +630,7 @@ raisins_noout <- raisins[!(row.names(raisins) %in% c(695, 507, 837, 291, 86, 488
 ```
 
 #### First the "normal" model
+
 
 ```r
 ols_imp2_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no outliers
@@ -532,6 +680,7 @@ accuracy_ols_fulld_n
 ```
 ## [1] 0.8635347
 ```
+
 #### Then the robust one
 
 
@@ -584,7 +733,6 @@ accuracy_olsrob_fulld_n
 ## [1] 0.8635347
 ```
 
-
 ### We now move to logistic regression
 
 
@@ -626,6 +774,7 @@ hist(fitted(logistic_model))
 
 #### We perform best subset selection on the logistic model as well
 
+
 ```r
 bestglm(raisins, family = gaussian, IC = "BIC")
 ```
@@ -653,8 +802,10 @@ vif(imp_logistic_model)
 ##  422.14309  554.65662   22.25865
 ```
 
-####  These still appears to have multicollinearity issues.
+#### These still appears to have multicollinearity issues.
+
 #### As before, we use our intuition to build a minimal logistic model
+
 #### We actually build two of them:
 
 
@@ -679,6 +830,7 @@ vif(minimal2_logistic_model)
 ```
 
 #### We now create a table with the accuracies of all our models
+
 
 ```r
 accuracies <- data.frame(Model = character(),
@@ -722,6 +874,7 @@ accuracies
 ```
 
 #### Since the minimal logisitc model with the perimeter is the best one, we compute diagnostics on it.
+
 
 ```r
 predicted_probs_logit <- predict(minimal2_logistic_model, type = "response")
@@ -797,8 +950,8 @@ accuracies
 ## 6                 lpm_rob 86.22222
 ```
 
-
 ## We now performe some actual statistical learning
+
 #### We split our data in train and test set
 
 
@@ -822,6 +975,21 @@ mse = function(predictions,data,y){
   mse = (1/nrow(data))*sum((residuals^2))
   return(mse)
 }
+```
+
+#### Accuracy function
+
+
+```r
+# Casual Deep Learning accuracy function
+CDP_accuracy <- function(test_predictions_vector, test_set){
+        model_classes = ifelse(test_predictions_vector >= 0.5, 1,0)
+        modelCM<-table(model_classes,test_set$Class)
+        modelCM
+        model_right_guesses = modelCM[1] + modelCM[4]
+        model_accuracy = model_right_guesses/length(model_classes)
+        return(model_accuracy)
+        }
 ```
 
 ## MODELS
@@ -866,7 +1034,7 @@ ols_test_predictions = predict.lm(ols,newdata = test)
 hist(fitted(ols))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-31-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
 
 ```r
 # Calculate MSE for the training data
@@ -881,6 +1049,15 @@ mse_train
 ```r
 # Calculate MSE for the test data
 mse_test<-mse(ols_test_predictions,test,"Class") #test error
+# Calculate accuracy
+CDP_accuracy(ols_test_predictions, test)
+```
+
+```
+## [1] 0.8555556
+```
+
+```r
 mse_test # it was 0.1346953 before changing variables # it's 0.145 after reducing the model
 ```
 
@@ -930,7 +1107,7 @@ ols_robust_test_predictions = predict(ols_robust, newdata = test)
 hist(fitted(ols_robust))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
 
 ```r
 # Calculate MSE for the training data
@@ -950,15 +1127,76 @@ mse(ols_robust_test_predictions, test, "Class") #test error
 ## [1] 0.1356805
 ```
 
+```r
+# Calculate accuracy
+CDP_accuracy(ols_robust_test_predictions, test)
+```
+
+```
+## [1] 0.8481481
+```
+
 ### 3. LOGISTIC
 
 
 ```r
 library(broom)
 
-# 3. Logistic
-logistic = glm(Class ~ Perimeter + Eccentricity, data = train, family = binomial(link = 'logit'))
+# 3. Logistic before diagnostic
+logistic = glm(Class ~ ., data = train, family = binomial(link = 'logit'))
 tidy(logistic)
+```
+
+```
+## # A tibble: 8 × 5
+##   term              estimate std.error statistic p.value
+##   <chr>                <dbl>     <dbl>     <dbl>   <dbl>
+## 1 (Intercept)     -13.3       8.67       -1.54   0.124  
+## 2 Area              0.000473  0.000228    2.08   0.0377 
+## 3 MajorAxisLength   0.0184    0.0222      0.831  0.406  
+## 4 MinorAxisLength   0.113     0.0355      3.18   0.00147
+## 5 Eccentricity     12.1       5.07        2.40   0.0166 
+## 6 ConvexArea       -0.000706  0.000226   -3.12   0.00179
+## 7 Extent           -0.135     3.55       -0.0381 0.970  
+## 8 Perimeter        -0.0100    0.00926    -1.09   0.278
+```
+
+```r
+hist(fitted(logistic))
+```
+
+![](presentation_files/figure-html/unnamed-chunk-34-1.png)<!-- -->
+
+```r
+#logistic by hand
+logistic_test_predictions = predict(logistic, newdata = test)
+mse(fitted(logistic), train, "Class") # 0.09080575 before <- 0.09835077 after 
+```
+
+```
+## [1] 0.09080575
+```
+
+```r
+mse(logistic_test_predictions, test, "Class")
+```
+
+```
+## [1] 37.4428
+```
+
+```r
+CDP_accuracy(logistic_test_predictions, test)
+```
+
+```
+## [1] 0.8740741
+```
+
+```r
+# 3. Logistic after diagnostic
+logistic_ad = glm(Class ~ Perimeter + Eccentricity, data = train, family = binomial(link = 'logit'))
+tidy(logistic_ad)
 ```
 
 ```
@@ -971,15 +1209,15 @@ tidy(logistic)
 ```
 
 ```r
-hist(fitted(logistic))
+hist(fitted(logistic_ad))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-34-2.png)<!-- -->
 
 ```r
 #logistic by hand
-logistic_test_predictions = predict(logistic, newdata = test)
-mse(fitted(logistic), train, "Class") # 0.09080575 before <- 0.09835077 after 
+logistic_ad_test_predictions = predict(logistic_ad, newdata = test)
+mse(fitted(logistic_ad), train, "Class") # 0.09080575 before <- 0.09835077 after 
 ```
 
 ```
@@ -987,11 +1225,19 @@ mse(fitted(logistic), train, "Class") # 0.09080575 before <- 0.09835077 after
 ```
 
 ```r
-mse(logistic_test_predictions, test, "Class")
+mse(logistic_ad_test_predictions, test, "Class")
 ```
 
 ```
 ## [1] 12.18564
+```
+
+```r
+CDP_accuracy(logistic_ad_test_predictions, test)
+```
+
+```
+## [1] 0.8481481
 ```
 
 ### 4. RIDGE
@@ -1006,7 +1252,7 @@ ridge=glmnet(X,y,alpha=0)
 plot(ridge,xvar="lambda", label = TRUE) # Extent(4) and Eccentricity (6) are the variables kept
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-34-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-35-1.png)<!-- -->
 
 ```r
 ridge_fitted = predict(ridge, newx = X) # fitted value for the training set using the best lambda value automatically selected by the function
@@ -1032,10 +1278,11 @@ coef(cv.ridge)
 plot(cv.ridge) # cv mse of the ridge
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-34-2.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-35-2.png)<!-- -->
 
 ```r
-cv.ridge_predicted = predict(cv.ridge, newx = X)
+cv.ridge_fitted = predict(cv.ridge, newx = X)
+cv.ridge_predicted = predict(cv.ridge, newx = model.matrix(Class~.-1, data = test))
 mse(ridge_fitted, train, "Class") # training error of the ridge
 ```
 
@@ -1052,11 +1299,28 @@ mse(ridge_predicted, test, "Class") # test error of the ridge
 ```
 
 ```r
+mse(cv.ridge_fitted, train, "Class") # cv test error of the ridge
+```
+
+```
+## [1] 0.1321348
+```
+
+```r
 mse(cv.ridge_predicted, test, "Class") # cv test error of the ridge
 ```
 
 ```
-## [1] 0.3101069
+## [1] 0.1466852
+```
+
+```r
+# Calculate accuracy
+CDP_accuracy(cv.ridge_predicted, test)
+```
+
+```
+## [1] 0.8444444
 ```
 
 ### 5. LASSO
@@ -1069,7 +1333,7 @@ fit.lasso=glmnet(X,y)
 plot(fit.lasso,xvar="lambda",label=TRUE)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-35-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-36-1.png)<!-- -->
 
 ```r
 # Perform cross-validation for lasso regression
@@ -1078,10 +1342,10 @@ cv.lasso=cv.glmnet(X,y)
 plot(cv.lasso)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-35-2.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-36-2.png)<!-- -->
 
 ```r
-coef(cv.lasso)
+coef(cv.lasso) # variables kept are all but Extent
 ```
 
 ```
@@ -1099,10 +1363,30 @@ coef(cv.lasso)
 
 ```r
 # Calculate mean squared error for the training data
-#mse(fit.lasso, raisins, "Class")
-##Predict using the lasso regression model
-#predict(fit.lasso,newx = X)
-#
+cv.lasso_fitted = predict(cv.lasso, newx = X)
+cv.lasso_predicted = predict(cv.lasso, newx = model.matrix(Class~.-1, data = test))
+mse(cv.lasso_fitted, train, "Class") # train error of the lasso
+```
+
+```
+## [1] 0.1246778
+```
+
+```r
+mse(cv.lasso_predicted, test, "Class") # test error of the lasso
+```
+
+```
+## [1] 0.1428101
+```
+
+```r
+# Calculate accuracy
+CDP_accuracy(cv.lasso_predicted, test)
+```
+
+```
+## [1] 0.8555556
 ```
 
 ### 6. TREE
@@ -1110,32 +1394,107 @@ coef(cv.lasso)
 
 ```r
 library(tree)
+library(rpart.plot)
+
 # Fit the decision tree model
-tree = tree(Class ~ ., data = raisins)
-# Plot the decision tree
-plot(tree)
-text(tree)
+treeFit <- tree(Class ~ ., data = train)
+summary(treeFit)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-36-1.png)<!-- -->
+```
+## 
+## Regression tree:
+## tree(formula = Class ~ ., data = train)
+## Variables actually used in tree construction:
+## [1] "MajorAxisLength" "Perimeter"       "Extent"         
+## Number of terminal nodes:  6 
+## Residual mean deviance:  0.08826 = 55.07 / 624 
+## Distribution of residuals:
+##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+## -0.92040 -0.01333  0.03313  0.00000  0.07960  0.98670
+```
 
 ```r
-tree_test_predictions = predict(tree, newdata = test, type = "tree")
+# Convert the tree object to an rpart object
+treeFit_rpart <- rpart(treeFit)
 
-# Make predictions on the training data
-tree_predictions = predict(tree, newdata = train[,-8], type = "tree")
+# Plot the decision tree using rpart.plot
+rpart.plot(treeFit_rpart, box.col = c("#DD8D29", "#46ACC8"), shadow.col = "gray")
+```
 
-# Calculate mean squared error for the test data
-#mse(tree_test_predictions, test, "Class")
+![](presentation_files/figure-html/unnamed-chunk-37-1.png)<!-- -->
 
-#plot carino
-#valutarlo : prendere predizioni e calcolare mse su training e test
-#confusion matrix
+
+```r
+raisins_shb = read.csv(
+  "https://raw.githubusercontent.com/LeonardoAcquaroli/raisins_and_mushrooms/main/datasets/Raisin_Dataset.csv",
+  sep = ";", stringsAsFactors = TRUE, header = TRUE)
+
+# remove the Class column  
+raisins_shb <- raisins_shb[,-9] 
+colnames(raisins_shb)
+```
+
+```
+## [1] "Area"            "MajorAxisLength" "MinorAxisLength" "Eccentricity"   
+## [5] "ConvexArea"      "Extent"          "Perimeter"       "Class_literal"
+```
+
+```r
+set.seed(42)
+training_index_shb = createDataPartition(raisins_shb$Class_literal, p=0.7, list = FALSE) # index of the train set examples
+train_shb = raisins_shb[training_index_shb,]
+test_shb = raisins_shb[-training_index_shb,]
+
+treeFit_rpart_shb <- rpart(formula = Class_literal  ~ . , data = train_shb)
+
+# Plot the decision tree using rpart.plot
+rpart.plot(treeFit_rpart_shb, box.col = c("#DD8D29", "#46ACC8"), shadow.col = "gray")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-38-1.png)<!-- -->
+
+
+```r
+#training prediction
+tree_fitted <- predict(treeFit, newdata = train)
+
+#test predictions
+tree_predicted <- predict(treeFit, newdata = test)
+
+mse(tree_fitted, train, "Class") # training error of the train
+```
+
+```
+## [1] 0.08741554
+```
+
+```r
+mse(tree_predicted, test, "Class") # test error of the test
+```
+
+```
+## [1] 0.1213496
+```
+
+```r
+# Calculate accuracy
+CDP_accuracy(tree_predicted, test)
+```
+
+```
+## [1] 0.8555556
+```
+
+```r
+# This approach leads to correct predictions for around 85.55% of the raisins in the test data set.
+# The best results achieved in the paper were 86.44% with a SVM
 ```
 
 ### 7. KNN
 
-```
+
+```r
 # Scaling
 train.array <- scale(train[, 1:7])
 test.array<- scale(test[, 1:7])
@@ -1163,9 +1522,25 @@ best_k <- k_values[which.max(accuracy_scores)]
 
 #print(paste("Accuracy scores:", accuracy_scores))
 print(paste("Best K value:", best_k))
+```
 
+```
+## [1] "Best K value: 5"
+```
+
+```r
 #Data frame with K values and accuracy
 k_values_results <- data.frame(K = k_values, Accuracy = accuracy_scores)
+Knn_accuracy =  k_values_results[which.max(k_values_results$Accuracy),]
+Knn_accuracy
+```
+
+```
+##   K  Accuracy
+## 5 5 0.8407407
+```
+
+```r
 # Plot
 ggplot(k_values_results, aes(x = K, y = 1 - Accuracy)) +
   geom_line() +
@@ -1174,6 +1549,48 @@ ggplot(k_values_results, aes(x = K, y = 1 - Accuracy)) +
   ggtitle("Test Error vs K") +
   theme_minimal()
 ```
+
+![](presentation_files/figure-html/unnamed-chunk-40-1.png)<!-- -->
+
+# Predictive power table
+
+
+```r
+mse_list = c(mse(ols_test_predictions,test, "Class"),
+             mse(ols_robust_test_predictions,test, "Class"),
+             mse(logistic_test_predictions, test, "Class"),
+             mse(logistic_ad_test_predictions, test, "Class"),
+             mse(cv.ridge_predicted, test, "Class"),
+             mse(cv.lasso_predicted, test, "Class"),
+             mse(tree_predicted, test, "Class"),
+             NA)
+accuracy_list = c(CDP_accuracy(ols_test_predictions, test),
+                  CDP_accuracy(ols_robust_test_predictions, test),
+                  CDP_accuracy(logistic_test_predictions, test),
+                  CDP_accuracy(logistic_ad_test_predictions, test),
+                  CDP_accuracy(cv.ridge_predicted, test),
+                  CDP_accuracy(cv.lasso_predicted, test),
+                  CDP_accuracy(tree_predicted, test),
+                  Knn_accuracy$Accuracy)
+
+sumupDF = data.frame(Test_mse = mse_list, Accuracy = accuracy_list,
+                     row.names = c("OLS", "Robust OLS", "Logistic", "Logistic (after diagnostics)","Ridge", "Lasso", "Tree", "K-NN"))
+sumupDF
+```
+
+```
+##                                Test_mse  Accuracy
+## OLS                           0.1453523 0.8555556
+## Robust OLS                    0.1356805 0.8481481
+## Logistic                     37.4428017 0.8740741
+## Logistic (after diagnostics) 12.1856431 0.8481481
+## Ridge                         0.1466852 0.8444444
+## Lasso                         0.1428101 0.8555556
+## Tree                          0.1213496 0.8555556
+## K-NN                                 NA 0.8407407
+```
+
+Our logistic model actually beats the SVM approach that achieved the best performance in the paper.
 
 # Unsupervised models
 
@@ -1270,21 +1687,18 @@ summary(pr.out)
 ```
 
 
-
-
 ```r
 fviz_eig(pr.out, addlabels = TRUE, ylim = c(0, 70), main = "Scree Plot of PCA")
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-43-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-47-1.png)<!-- -->
 
 ```r
 fviz_pca_var(pr.out, col.var = "blue", col.quanti.sup = "red", 
              addlabels = TRUE, repel = TRUE)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-43-2.png)<!-- -->
-
+![](presentation_files/figure-html/unnamed-chunk-47-2.png)<!-- -->
 
 
 ```r
@@ -1294,7 +1708,7 @@ arrows(0, 0, pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, length = 0.1, angle
 text(pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, labels = rownames(pr.out[[2]]), pos = 3)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-44-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-48-1.png)<!-- -->
 
 
 ```r
@@ -1377,7 +1791,15 @@ km.out
 ## [6] "betweenss"    "size"         "iter"         "ifault"
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-47-1.png)<!-- -->
+
+```r
+#Since clusters do not correspond to a specific category, we cannot estimate accuracy. 
+#However, distribution should be 450-450, but it is 189-711, so the algorithm is clearly not adequate for this dataset.
+plot (df, col = adjustcolor(km.out$cluster + 1, alpha.f = 0.1),
+main = "K- Means Clustering Results with K = 2", pch = 20)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-51-1.png)<!-- -->
 
 ### 3. Clustering su PCA
 
@@ -1436,4 +1858,12 @@ km.out2
 ## [6] "betweenss"    "size"         "iter"         "ifault"
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-49-1.png)<!-- -->
+
+```r
+#Graphical representation of the clusters. 
+#Results are slightly better on PC than on initial features
+plot (pcadf, col = adjustcolor(km.out2$cluster + 1, alpha.f = 0.5),
+main = "K- Means Clustering Results with K = 2", pch = 20)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-53-1.png)<!-- -->

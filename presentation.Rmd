@@ -181,21 +181,25 @@ ggtitle(paste0("Comparison between Perimeter's distribution" ))
 ## We first use all the dataset
 
 #### We run a basic ols model, which would be a linear probability model
+
 ```{r}
 ols <- lm("Class ~ .",data=raisins)
 summary(ols)
 ```
 
 #### We check for heteroscedasticity and multicollinearity
+
 ```{r}
 check_heteroscedasticity(ols) # there is heteroskedasticity
 check_model(ols)
 vif(ols)
 sqrt(vif(ols)) > 2
 ```
+
 #### There appears to be heteroscedacity, plus the multicollinearity is extremely high
 
 #### We try to tackle multicollinearity by reducing the variables in the model. We use best subset selection.
+
 ```{r, fig.align='center'}
 regfit.full=regsubsets(Class ~.,data=raisins, nvmax=7)
 reg.summary=summary(regfit.full)
@@ -205,15 +209,20 @@ plot(regfit.full,scale="Cp")
 ```
 
 #### As we can see, the best model appears to be one with 5 variables. We run this improved ols model
+
 ```{r}
 ols_imp <- lm("Class ~ Area + MajorAxisLength + 
               Eccentricity + ConvexArea + Perimeter",data=raisins)
 summary(ols_imp)
 vif(ols_imp) # the VIF is still too high!
 ```
-#### the VIF is extremely high. 
+
+#### the VIF is extremely high.
+
 #### Given that most of our variables are highly correlated, we identify three "proper" dimensions over which our data span.
+
 #### Thus, we perform best subset selection specifying that we want at most 3 variables
+
 ```{r, fig.align='center'}
 regfit.full=regsubsets(Class ~.,data=raisins, nvmax=3)
 reg.summary=summary(regfit.full)
@@ -254,6 +263,7 @@ text(cooks_dist, raw_res, labels = 1:length(cooks_dist), pos = 3)
 ```
 
 #### The most problematic observations appear to be: 695, 507, 837, 291, 86, 488. We should dig deeper into them.
+
 ```{r, fig.align='center'}
 outliers_obs <- c(695, 507, 837, 291, 86, 488)
 outliers_df <- raisins[outliers_obs, ]
@@ -288,8 +298,6 @@ print(p)
 
 #### These observations clearly have a very large "Perimeter", however they do not appear to be completely out of this world. <br> We can still try to remove them and see how the performance changes. <br> We now plot the accuracy of our model on the whole dataset
 
-
-
 ```{r}
 #computation of the accuracy on the full dataset
 fitvols_fulld = predict(ols_imp2, raisins) # fulld identifies the full dataset
@@ -302,12 +310,14 @@ accuracy_ols_fulld
 
 #### Given that we found heteroscedasticity, we perform the same model with the robust option.
 
-```{r} 
+```{r}
 #ROBUST OLS
 ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
 summary(ols_robust)
 ```
+
 #### We compute the accuracy as we did before
+
 ```{r}
 fitvolsrob_fulld = predict(ols_robust, raisins) # fulld identifies the full dataset
 predolsrob_fulld = ifelse(fitvolsrob_fulld < 0.50, 0, 1)
@@ -317,6 +327,7 @@ accuracy_olsrob_fulld <- 776/900
 accuracy_olsrob_fulld
 
 ```
+
 #### We now remove the "outliers" from the dataset and preform the very same models.
 
 ```{r}
@@ -324,6 +335,7 @@ raisins_noout <- raisins[!(row.names(raisins) %in% c(695, 507, 837, 291, 86, 488
 ```
 
 #### First the "normal" model
+
 ```{r}
 ols_imp2_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no outliers
 summary(ols_imp2_n)
@@ -334,6 +346,7 @@ table(accols_fulld_n)
 accuracy_ols_fulld_n <- 772/894
 accuracy_ols_fulld_n
 ```
+
 #### Then the robust one
 
 ```{r}
@@ -347,7 +360,6 @@ accuracy_olsrob_fulld_n <- 772/894
 accuracy_olsrob_fulld_n
 ```
 
-
 ### We now move to logistic regression
 
 ```{r, fig.align='center'}
@@ -358,6 +370,7 @@ hist(fitted(logistic_model))
 ```
 
 #### We perform best subset selection on the logistic model as well
+
 ```{r}
 bestglm(raisins, family = gaussian, IC = "BIC")
 imp_logistic_model <- glm(Class ~ Area + ConvexArea + Perimeter, 
@@ -366,8 +379,10 @@ imp_logistic_model <- glm(Class ~ Area + ConvexArea + Perimeter,
 vif(imp_logistic_model)
 ```
 
-####  These still appears to have multicollinearity issues.
+#### These still appears to have multicollinearity issues.
+
 #### As before, we use our intuition to build a minimal logistic model
+
 #### We actually build two of them:
 
 ```{r}
@@ -379,6 +394,7 @@ vif(minimal2_logistic_model)
 ```
 
 #### We now create a table with the accuracies of all our models
+
 ```{r}
 accuracies <- data.frame(Model = character(),
                          Accuracy = numeric())
@@ -411,6 +427,7 @@ accuracies
 ```
 
 #### Since the minimal logisitc model with the perimeter is the best one, we compute diagnostics on it.
+
 ```{r}
 predicted_probs_logit <- predict(minimal2_logistic_model, type = "response")
 residuals_logit <- raisins$Class - predicted_probs_logit
@@ -442,8 +459,8 @@ plot(compare_performance(ols_imp2, minimal2_logistic_model, rank = TRUE, verbose
 accuracies
 ```
 
-
 ## We now performe some actual statistical learning
+
 #### We split our data in train and test set
 
 ```{r}
@@ -503,13 +520,9 @@ mse_train<-mse(fitted(ols), train, "Class") #training error
 mse_train
 # Calculate MSE for the test data
 mse_test<-mse(ols_test_predictions,test,"Class") #test error
-<<<<<<< HEAD
-mse_test
 # Calculate accuracy
 CDP_accuracy(ols_test_predictions, test)
-=======
 mse_test # it was 0.1346953 before changing variables # it's 0.145 after reducing the model
->>>>>>> 22aede16a8fe9c2a08137773b55507aac83aac28
 ```
 
 ### 2. ROBUST OLS
@@ -540,8 +553,8 @@ CDP_accuracy(ols_robust_test_predictions, test)
 ```{r}
 library(broom)
 
-# 3. Logistic
-logistic = glm(Class ~ Perimeter + Eccentricity, data = train, family = binomial(link = 'logit'))
+# 3. Logistic before diagnostic
+logistic = glm(Class ~ ., data = train, family = binomial(link = 'logit'))
 tidy(logistic)
 hist(fitted(logistic))
 #logistic by hand
@@ -549,6 +562,16 @@ logistic_test_predictions = predict(logistic, newdata = test)
 mse(fitted(logistic), train, "Class") # 0.09080575 before <- 0.09835077 after 
 mse(logistic_test_predictions, test, "Class")
 CDP_accuracy(logistic_test_predictions, test)
+
+# 3. Logistic after diagnostic
+logistic_ad = glm(Class ~ Perimeter + Eccentricity, data = train, family = binomial(link = 'logit'))
+tidy(logistic_ad)
+hist(fitted(logistic_ad))
+#logistic by hand
+logistic_ad_test_predictions = predict(logistic_ad, newdata = test)
+mse(fitted(logistic_ad), train, "Class") # 0.09080575 before <- 0.09835077 after 
+mse(logistic_ad_test_predictions, test, "Class")
+CDP_accuracy(logistic_ad_test_predictions, test)
 ```
 
 ### 4. RIDGE
@@ -655,11 +678,7 @@ CDP_accuracy(tree_predicted, test)
 
 ### 7. KNN
 
-<<<<<<< HEAD
 ```{r}
-=======
-```
->>>>>>> 22aede16a8fe9c2a08137773b55507aac83aac28
 # Scaling
 train.array <- scale(train[, 1:7])
 test.array<- scale(test[, 1:7])
@@ -708,6 +727,7 @@ ggplot(k_values_results, aes(x = K, y = 1 - Accuracy)) +
 mse_list = c(mse(ols_test_predictions,test, "Class"),
              mse(ols_robust_test_predictions,test, "Class"),
              mse(logistic_test_predictions, test, "Class"),
+             mse(logistic_ad_test_predictions, test, "Class"),
              mse(cv.ridge_predicted, test, "Class"),
              mse(cv.lasso_predicted, test, "Class"),
              mse(tree_predicted, test, "Class"),
@@ -715,13 +735,14 @@ mse_list = c(mse(ols_test_predictions,test, "Class"),
 accuracy_list = c(CDP_accuracy(ols_test_predictions, test),
                   CDP_accuracy(ols_robust_test_predictions, test),
                   CDP_accuracy(logistic_test_predictions, test),
+                  CDP_accuracy(logistic_ad_test_predictions, test),
                   CDP_accuracy(cv.ridge_predicted, test),
                   CDP_accuracy(cv.lasso_predicted, test),
                   CDP_accuracy(tree_predicted, test),
                   Knn_accuracy$Accuracy)
 
 sumupDF = data.frame(Test_mse = mse_list, Accuracy = accuracy_list,
-                     row.names = c("OLS", "Robust OLS", "Logistic", "Ridge", "Lasso", "Tree", "K-NN"))
+                     row.names = c("OLS", "Robust OLS", "Logistic", "Logistic (after diagnostics)","Ridge", "Lasso", "Tree", "K-NN"))
 sumupDF
 ```
 
