@@ -79,6 +79,7 @@ sqrt(vif(ols_imp2)) > 2
 
 check_model(ols_imp2)
 plot(ols_imp2)
+check_heteroscedasticity(ols_imp2) # there is heteroskedasticity
 
 # ols_imp2 is our final model as far as linear regressions goes. 
 # let's apply further diagnostics
@@ -100,11 +101,52 @@ abline(v = cooks_threshold, lty = 3, col = "green")
 text(cooks_dist, raw_res, labels = 1:length(cooks_dist), pos = 3)
 # wow there are a lot of outliers
 
+# most problematic observations appear to be: 695, 507, 837, 291, 86, 488
+
+
+#computation of the accuracy on the full dataset
+fitvols_fulld = predict(ols_imp2, raisins) # fulld identifies the full dataset
+predols_fulld = ifelse(fitvols_fulld < 0.50, 0, 1)
+predols_fulld 
+accols_fulld = raisins$Class == predols_fulld
+table(accols_fulld)
+accuracy_ols_fulld <- 776/900
+accuracy_ols_fulld
+
 #ROBUST OLS
 ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
 summary(ols_robust)
 check_model(ols_robust)
 
+fitvolsrob_fulld = predict(ols_robust, raisins) # fulld identifies the full dataset
+predolsrob_fulld = ifelse(fitvolsrob_fulld < 0.50, 0, 1)
+accolsrob_fulld = raisins$Class == predolsrob_fulld
+table(accolsrob_fulld)
+accuracy_olsrob_fulld <- 776/900
+accuracy_olsrob_fulld
+
+# what if we remove the "outliers" previously mentioned? 695, 507, 837, 291, 86, 488
+raisins_noout <- raisins[!(row.names(raisins) %in% c(695, 507, 837, 291, 86, 488)), ]
+
+#let's implement the models on this modified data set
+ols_imp2_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no outliers
+summary(ols_imp2_n)
+fitvols_fulld_n = predict(ols_imp2_n, raisins_noout) # fulld identifies the full dataset
+predols_fulld_n = ifelse(fitvols_fulld_n < 0.50, 0, 1)
+accols_fulld_n = raisins_noout$Class == predols_fulld_n
+table(accols_fulld_n)
+accuracy_ols_fulld_n <- 772/894
+accuracy_ols_fulld_n
+
+# same for the robust regression
+ols_rob_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no-outliers
+summary(ols_rob_n)
+fitvolsrob_fulld_n = predict(ols_rob_n, raisins_noout) # fulld identifies the full dataset
+predolsrob_fulld_n = ifelse(fitvolsrob_fulld_n < 0.50, 0, 1)
+accolsrob_fulld_n = raisins_noout$Class == predolsrob_fulld_n
+table(accolsrob_fulld_n)
+accuracy_olsrob_fulld_n <- 772/894
+accuracy_olsrob_fulld_n
 
 
 # LOGISTIC REGRESSION
@@ -139,7 +181,9 @@ accuracies <- data.frame(Model = character(),
 models <- list(logistic = logistic_model, 
                imp_logistic = imp_logistic_model,
                minimal_logit_extent = minimal1_logistic_model,
-               minimal_logit_perimeter = minimal2_logistic_model)
+               minimal_logit_perimeter = minimal2_logistic_model,
+               lpm = ols_imp2,
+               lpm_rob = ols_robust)
 
 for (model_name in names(models)) {
   model <- models[[model_name]]
@@ -178,7 +222,7 @@ plot(raisins$Perimeter, residuals_logit, xlab = "Perimeter", ylab = "Standardize
 # Diagnostics with DHARMa
 
 # Create a simulated residuals object
-simulated_residuals <- simulateResiduals(model, n = 100)
+simulated_residuals <- simulateResiduals(minimal2_logistic_model, n = 100)
 # Plot standardized residuals using DHARMa's built-in diagnostic plots
 plot(simulated_residuals)
 
@@ -186,6 +230,7 @@ plot(simulated_residuals)
 compare_performance(ols_imp2, ols_robust, minimal2_logistic_model)
 plot(compare_performance(ols_imp2, minimal2_logistic_model, rank = TRUE, verbose = FALSE))
 
+accuracies
 
 # 4. RIDGE # I didn't check this parts though
 x = model.matrix(Class~.-1, data = raisins)
