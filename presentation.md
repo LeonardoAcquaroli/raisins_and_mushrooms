@@ -55,6 +55,13 @@ library(e1071)
 library(caTools)
 library(class)
 library(pROC)
+library(tree)
+library(leaps)   # best subset
+library(bestglm) # best subset for logistic
+library(MASS)    # diagnostics
+library(olsrr)   # diagnostics
+library(influence.ME)
+library(DHARMa)
 ```
 
 #### Loading data-set
@@ -122,7 +129,677 @@ Black: Kecimen, Yellow: Besni
 
 # Supervised models
 
-#### Splitting train and test test
+## We first use all the dataset
+
+#### We run a basic ols model, which would be a linear probability model
+
+```r
+ols <- lm("Class ~ .",data=raisins)
+summary(ols)
+```
+
+```
+## 
+## Call:
+## lm(formula = "Class ~ .", data = raisins)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.12899 -0.25192  0.01594  0.25715  1.23867 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)      3.568e+00  3.923e-01   9.096  < 2e-16 ***
+## Area            -3.869e-05  6.034e-06  -6.412 2.33e-10 ***
+## MajorAxisLength  2.189e-03  1.146e-03   1.910  0.05643 .  
+## MinorAxisLength  2.154e-04  1.483e-03   0.145  0.88456    
+## Eccentricity    -9.166e-01  2.957e-01  -3.100  0.00199 ** 
+## ConvexArea       4.894e-05  6.059e-06   8.077 2.15e-15 ***
+## Extent           8.348e-02  2.772e-01   0.301  0.76337    
+## Perimeter       -3.837e-03  5.800e-04  -6.616 6.36e-11 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.3508 on 892 degrees of freedom
+## Multiple R-squared:  0.5123,	Adjusted R-squared:  0.5084 
+## F-statistic: 133.8 on 7 and 892 DF,  p-value: < 2.2e-16
+```
+
+#### We check for heteroskedasticity and multicollinearity
+
+```r
+check_heteroscedasticity(ols) # there is heteroskedasticity
+```
+
+```
+## Warning: Heteroscedasticity (non-constant error variance) detected (p = 0.040).
+```
+
+```r
+check_model(ols)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-8-1.png)<!-- -->
+
+```r
+vif(ols)
+```
+
+```
+##            Area MajorAxisLength MinorAxisLength    Eccentricity      ConvexArea 
+##      404.718824      129.152882       40.166637        5.210356      445.947568 
+##          Extent       Perimeter 
+##        1.605335      184.252844
+```
+
+```r
+sqrt(vif(ols)) > 2
+```
+
+```
+##            Area MajorAxisLength MinorAxisLength    Eccentricity      ConvexArea 
+##            TRUE            TRUE            TRUE            TRUE            TRUE 
+##          Extent       Perimeter 
+##           FALSE            TRUE
+```
+#### There appears to be heteroskedacity, plus the multicollinearity is extremely high
+
+#### We try to tackle multicollinearity by reducing the variables in the model. We use best subset selection.
+
+```r
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=7)
+reg.summary=summary(regfit.full)
+plot(reg.summary$cp,xlab="Number of Variables",ylab="Cp")
+```
+
+<img src="presentation_files/figure-html/unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
+
+```r
+which.min(reg.summary$cp)
+```
+
+```
+## [1] 5
+```
+
+```r
+plot(regfit.full,scale="Cp")
+```
+
+<img src="presentation_files/figure-html/unnamed-chunk-9-2.png" style="display: block; margin: auto;" />
+
+#### As we can see, the best model appears to be one with 5 variables. We run this improved ols model
+
+```r
+ols_imp <- lm("Class ~ Area + MajorAxisLength + 
+              Eccentricity + ConvexArea + Perimeter",data=raisins)
+summary(ols_imp)
+```
+
+```
+## 
+## Call:
+## lm(formula = "Class ~ Area + MajorAxisLength + \n              Eccentricity + ConvexArea + Perimeter", 
+##     data = raisins)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.13065 -0.24783  0.01591  0.25803  1.24484 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)      3.683e+00  2.135e-01  17.252  < 2e-16 ***
+## Area            -3.776e-05  4.333e-06  -8.715  < 2e-16 ***
+## MajorAxisLength  2.067e-03  8.150e-04   2.536 0.011374 *  
+## Eccentricity    -9.437e-01  2.628e-01  -3.591 0.000347 ***
+## ConvexArea       4.842e-05  5.457e-06   8.875  < 2e-16 ***
+## Perimeter       -3.805e-03  4.144e-04  -9.183  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.3504 on 894 degrees of freedom
+## Multiple R-squared:  0.5122,	Adjusted R-squared:  0.5095 
+## F-statistic: 187.7 on 5 and 894 DF,  p-value: < 2.2e-16
+```
+
+```r
+vif(ols_imp) # the VIF is still too high!
+```
+
+```
+##            Area MajorAxisLength    Eccentricity      ConvexArea       Perimeter 
+##      209.089582       65.482372        4.124587      362.380343       94.243582
+```
+#### the VIF is extremely high. 
+### Given that most of our variables are highly correlated, we identify three "proper" dimensions over which our data span.
+#### Thus, we perform best subset selection specifying that we want at most 3 variables
+
+```r
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=3)
+reg.summary=summary(regfit.full)
+plot(regfit.full,scale="Cp")
+```
+
+<img src="presentation_files/figure-html/unnamed-chunk-11-1.png" style="display: block; margin: auto;" />
+
+#### We observe that two variables are very similar. Thus, we opt for the minimal model with two variables.
+
+
+```r
+ols_imp2 <- lm("Class ~ Eccentricity + Perimeter",data=raisins)
+summary(ols_imp2)
+```
+
+```
+## 
+## Call:
+## lm(formula = "Class ~ Eccentricity + Perimeter", data = raisins)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.03758 -0.30279  0.04866  0.28119  1.80574 
+## 
+## Coefficients:
+##                Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   2.511e+00  1.062e-01  23.634  < 2e-16 ***
+## Eccentricity -9.717e-01  1.509e-01  -6.441 1.93e-10 ***
+## Perimeter    -1.073e-03  4.977e-05 -21.569  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.3653 on 897 degrees of freedom
+## Multiple R-squared:  0.4681,	Adjusted R-squared:  0.4669 
+## F-statistic: 394.8 on 2 and 897 DF,  p-value: < 2.2e-16
+```
+
+```r
+vif(ols_imp2)
+```
+
+```
+## Eccentricity    Perimeter 
+##     1.250884     1.250884
+```
+
+```r
+check_model(ols_imp2)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
+
+#### ols_imp2 is our final model as far as linear regression goes. We now focus on its residuals.
+
+
+```r
+raw_res <- residuals(ols_imp2)
+threshold <- 3 * sd(raw_res)  # Define threshold as 3 times the SD
+threshold# how are the residuals distributed?
+```
+
+```
+## [1] 1.094547
+```
+
+```r
+hist(raw_res, breaks = 30, main = "Histogram of Raw Residuals", xlab = "Raw Residuals")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-13-1.png)<!-- -->
+
+#### We also compute Cook's distance and plot it with the residuals
+
+
+```r
+cooks_dist <- cooks.distance(ols_imp2)
+cooks_threshold <- 4/897
+plot(cooks_dist, raw_res, main = "Cook's Distance vs. Raw Residuals",
+     xlab = "Cook's Distance", ylab = "Raw Residuals")
+abline(h = 0, lty = 2, col = "red")  # Reference line at y = 0
+abline(h = threshold, lty = 3, col = "blue")  # Threshold line for raw residuals (upper)
+abline(h = -threshold, lty = 3, col = "blue")  # Threshold line for raw residuals (lower)
+abline(v = cooks_threshold, lty = 3, col = "green")
+text(cooks_dist, raw_res, labels = 1:length(cooks_dist), pos = 3)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-14-1.png)<!-- -->
+
+#### The most problematic observations appear to be: 695, 507, 837, 291, 86, 488. We should dig deeper into them.
+
+```r
+outliers_obs <- c(695, 507, 837, 291, 86, 488)
+outliers_df <- raisins[outliers_obs, ]
+non_outliers_df <- raisins[-outliers_obs, ]
+
+# Plot without outliers
+p <- ggplot(non_outliers_df, aes(x = Perimeter, y = Eccentricity)) +
+  geom_point() +
+  labs(title = "Scatter Plot emphasising outliers",
+       x = "Perimeter",
+       y = "Eccentricity")
+
+# Add outliers with distinct color
+p <- p +
+  geom_point(data = outliers_df, color = "red", size = 3) +
+  geom_text(data = outliers_df, aes(label = paste(rownames(outliers_df))), vjust = -1)
+
+# Median values
+p <- p +
+  geom_vline(aes(xintercept = median(Perimeter)), linetype = "dashed") +
+  geom_hline(aes(yintercept = median(Eccentricity)), linetype = "dashed")
+
+# Regression line
+p <- p +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(data = non_outliers_df, method = "lm", se = FALSE, linetype = "dashed", color = "blue")
+
+# Display the plot
+print(p)
+```
+
+<img src="presentation_files/figure-html/unnamed-chunk-15-1.png" style="display: block; margin: auto;" />
+
+#### These observations clearly have a very large "Perimeter", however they do not appear to be completely wrong.<br> We can still try to remove them and see how the performance changes. <br> We now plot the accuracy of our model on the whole dataset
+
+
+
+
+```r
+#computation of the accuracy on the full dataset
+fitvols_fulld = predict(ols_imp2, raisins) # fulld identifies the full dataset
+predols_fulld = ifelse(fitvols_fulld < 0.50, 0, 1)
+accols_fulld = raisins$Class == predols_fulld
+table(accols_fulld)
+```
+
+```
+## accols_fulld
+## FALSE  TRUE 
+##   124   776
+```
+
+```r
+accuracy_ols_fulld <- 776/900
+accuracy_ols_fulld
+```
+
+```
+## [1] 0.8622222
+```
+
+#### Given that we found heteroskedasticity, we perform the same model with the robust option.
+
+
+```r
+#ROBUST OLS
+ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
+summary(ols_robust)
+```
+
+```
+## 
+## Call:
+## lm_robust(formula = Class ~ Eccentricity + Perimeter, data = raisins, 
+##     se_type = "HC2")
+## 
+## Standard error type:  HC2 
+## 
+## Coefficients:
+##               Estimate Std. Error t value   Pr(>|t|)  CI Lower   CI Upper  DF
+## (Intercept)   2.510968  1.002e-01  25.069 1.541e-105  2.314392  2.7075452 897
+## Eccentricity -0.971708  1.367e-01  -7.108  2.403e-12 -1.240012 -0.7034040 897
+## Perimeter    -0.001073  6.693e-05 -16.039  4.297e-51 -0.001205 -0.0009421 897
+## 
+## Multiple R-squared:  0.4681 ,	Adjusted R-squared:  0.4669 
+## F-statistic: 251.8 on 2 and 897 DF,  p-value: < 2.2e-16
+```
+#### We compute the accuracy as we did before
+
+```r
+fitvolsrob_fulld = predict(ols_robust, raisins) # fulld identifies the full dataset
+predolsrob_fulld = ifelse(fitvolsrob_fulld < 0.50, 0, 1)
+accolsrob_fulld = raisins$Class == predolsrob_fulld
+table(accolsrob_fulld)
+```
+
+```
+## accolsrob_fulld
+## FALSE  TRUE 
+##   124   776
+```
+
+```r
+accuracy_olsrob_fulld <- 776/900
+accuracy_olsrob_fulld
+```
+
+```
+## [1] 0.8622222
+```
+#### We now remove the "outliers" from the dataset and preform the very same models.
+
+
+```r
+raisins_noout <- raisins[!(row.names(raisins) %in% c(695, 507, 837, 291, 86, 488)), ]
+```
+
+#### First the "normal" model
+
+```r
+ols_imp2_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no outliers
+summary(ols_imp2_n)
+```
+
+```
+## 
+## Call:
+## lm(formula = "Class ~ Eccentricity + Perimeter", data = raisins_noout)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.06624 -0.28222  0.05692  0.27255  0.76195 
+## 
+## Coefficients:
+##                Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   2.6476056  0.1026150  25.801  < 2e-16 ***
+## Eccentricity -0.9332612  0.1442159  -6.471  1.6e-10 ***
+## Perimeter    -0.0012245  0.0000504 -24.296  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.3489 on 891 degrees of freedom
+## Multiple R-squared:  0.5147,	Adjusted R-squared:  0.5136 
+## F-statistic: 472.5 on 2 and 891 DF,  p-value: < 2.2e-16
+```
+
+```r
+fitvols_fulld_n = predict(ols_imp2_n, raisins_noout) # fulld identifies the full dataset
+predols_fulld_n = ifelse(fitvols_fulld_n < 0.50, 0, 1)
+accols_fulld_n = raisins_noout$Class == predols_fulld_n
+table(accols_fulld_n)
+```
+
+```
+## accols_fulld_n
+## FALSE  TRUE 
+##   122   772
+```
+
+```r
+accuracy_ols_fulld_n <- 772/894
+accuracy_ols_fulld_n
+```
+
+```
+## [1] 0.8635347
+```
+#### Then the robust one
+
+
+```r
+ols_rob_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no-outliers
+summary(ols_rob_n)
+```
+
+```
+## 
+## Call:
+## lm(formula = "Class ~ Eccentricity + Perimeter", data = raisins_noout)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.06624 -0.28222  0.05692  0.27255  0.76195 
+## 
+## Coefficients:
+##                Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   2.6476056  0.1026150  25.801  < 2e-16 ***
+## Eccentricity -0.9332612  0.1442159  -6.471  1.6e-10 ***
+## Perimeter    -0.0012245  0.0000504 -24.296  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.3489 on 891 degrees of freedom
+## Multiple R-squared:  0.5147,	Adjusted R-squared:  0.5136 
+## F-statistic: 472.5 on 2 and 891 DF,  p-value: < 2.2e-16
+```
+
+```r
+fitvolsrob_fulld_n = predict(ols_rob_n, raisins_noout) # fulld identifies the full dataset
+predolsrob_fulld_n = ifelse(fitvolsrob_fulld_n < 0.50, 0, 1)
+accolsrob_fulld_n = raisins_noout$Class == predolsrob_fulld_n
+table(accolsrob_fulld_n)
+```
+
+```
+## accolsrob_fulld_n
+## FALSE  TRUE 
+##   122   772
+```
+
+```r
+accuracy_olsrob_fulld_n <- 772/894
+accuracy_olsrob_fulld_n
+```
+
+```
+## [1] 0.8635347
+```
+
+
+### We now move to logistic regression
+
+
+```r
+logistic_model <-  glm(Class ~ ., data = raisins, family = binomial(link = 'logit'))
+tidy(logistic_model)
+```
+
+```
+## # A tibble: 8 × 5
+##   term             estimate std.error statistic      p.value
+##   <chr>               <dbl>     <dbl>     <dbl>        <dbl>
+## 1 (Intercept)      2.23      7.04         0.317 0.751       
+## 2 Area            -0.000501  0.000124    -4.03  0.0000566   
+## 3 MajorAxisLength  0.0446    0.0160       2.79  0.00524     
+## 4 MinorAxisLength  0.0911    0.0269       3.38  0.000722    
+## 5 Eccentricity     3.89      4.91         0.792 0.428       
+## 6 ConvexArea       0.000409  0.000119     3.43  0.000594    
+## 7 Extent           0.683     2.72         0.251 0.802       
+## 8 Perimeter       -0.0361    0.00661     -5.46  0.0000000468
+```
+
+```r
+vif(logistic_model)
+```
+
+```
+##            Area MajorAxisLength MinorAxisLength    Eccentricity      ConvexArea 
+##      490.367743       70.630453       83.217726       12.954578      475.455021 
+##          Extent       Perimeter 
+##        1.328813       70.195325
+```
+
+```r
+hist(fitted(logistic_model))
+```
+
+<img src="presentation_files/figure-html/unnamed-chunk-22-1.png" style="display: block; margin: auto;" />
+
+#### We perform best subset selection on the logistic model as well
+
+```r
+bestglm(raisins, family = gaussian, IC = "BIC")
+```
+
+```
+## BIC
+## BICq equivalent for q in (5.38544187023149e-09, 0.532772479819852)
+## Best Model:
+##                  Estimate   Std. Error    t value     Pr(>|t|)
+## (Intercept)  3.228091e+00 1.445365e-01  22.334086 3.460498e-88
+## Area        -3.835214e-05 4.104717e-06  -9.343431 7.200693e-20
+## ConvexArea   5.187278e-05 5.028354e-06  10.316057 1.180887e-23
+## Perimeter   -3.508593e-03 2.454475e-04 -14.294674 6.599333e-42
+```
+
+```r
+imp_logistic_model <- glm(Class ~ Area + ConvexArea + Perimeter, 
+                    data = raisins, 
+                    family = binomial(link = 'logit'))
+vif(imp_logistic_model)
+```
+
+```
+##       Area ConvexArea  Perimeter 
+##  422.14309  554.65662   22.25865
+```
+
+####  These still appears to have multicollinearity issues.
+#### As before, we use our intuition to build a minimal logistic model
+#### We actually build two of them:
+
+
+```r
+minimal1_logistic_model <-  glm(Class ~ Extent + Eccentricity, data = raisins, family = binomial(link = 'logit'))
+vif(minimal1_logistic_model)
+```
+
+```
+##       Extent Eccentricity 
+##     1.116328     1.116328
+```
+
+```r
+minimal2_logistic_model <-  glm(Class ~ Eccentricity + Perimeter, data = raisins,family = binomial(link = 'logit'))
+vif(minimal2_logistic_model)
+```
+
+```
+## Eccentricity    Perimeter 
+##     1.012988     1.012988
+```
+
+#### We now create a table with the accuracies of all our models
+
+```r
+accuracies <- data.frame(Model = character(),
+                         Accuracy = numeric())
+
+models <- list(logistic = logistic_model, 
+               imp_logistic = imp_logistic_model,
+               minimal_logit_extent = minimal1_logistic_model,
+               minimal_logit_perimeter = minimal2_logistic_model,
+               lpm = ols_imp2,
+               lpm_rob = ols_robust)
+
+for (model_name in names(models)) {
+  model <- models[[model_name]]
+  
+  # Predict the outcome probabilities using the logistic regression model
+  pred_pr <- predict(model, raisins, type = "response")
+  # Convert the predicted probabilities to binary predictions (0 or 1)
+  pred_val <- ifelse(pred_pr > 0.5, 1, 0)
+  # Compare the predicted values with the actual outcome variable
+  actual_values <- raisins$Class
+  # Compute the number of correctly predicted values
+  correctly_pred <- sum(pred_val == actual_values)
+  # Compute the percentage of correctly predicted values
+  accuracy <- correctly_pred / length(actual_values) * 100
+  # Append the accuracy to the "accuracies" data frame
+  accuracies <- rbind(accuracies, data.frame(Model = model_name, Accuracy = accuracy))
+}
+
+accuracies
+```
+
+```
+##                     Model Accuracy
+## 1                logistic 85.77778
+## 2            imp_logistic 85.33333
+## 3    minimal_logit_extent 70.77778
+## 4 minimal_logit_perimeter 86.44444
+## 5                     lpm 86.22222
+## 6                 lpm_rob 86.22222
+```
+
+#### Since the minimal logisitc model with the perimeter is the best one, we compute diagnostics on it.
+
+```r
+predicted_probs_logit <- predict(minimal2_logistic_model, type = "response")
+residuals_logit <- raisins$Class - predicted_probs_logit
+
+plot(predicted_probs_logit, raisins$Class, xlab = "Predicted Probabilities", ylab = "Observed Responses",
+     main = "Observed vs. Predicted Probabilities", pch = 16)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
+
+```r
+#check relations with each predictor
+plot(raisins$Eccentricity, residuals_logit, xlab = "Eccentricity", ylab = "Standardized Residuals",
+     main = "Standardized Residuals vs. Predictor 1", pch = 16)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-26-2.png)<!-- -->
+
+```r
+plot(raisins$Perimeter, residuals_logit, xlab = "Perimeter", ylab = "Standardized Residuals",
+     main = "Standardized Residuals vs. Predictor 1", pch = 16)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-26-3.png)<!-- -->
+
+```r
+# Diagnostics with DHARMa
+
+# Create a simulated residuals object
+simulated_residuals <- simulateResiduals(minimal2_logistic_model, n = 100)
+# Plot standardized residuals using DHARMa's built-in diagnostic plots
+plot(simulated_residuals)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-26-4.png)<!-- -->
+
+### Comparison of all the models so far
+
+
+```r
+# Compare all the models
+compare_performance(ols_imp2, ols_robust, minimal2_logistic_model)
+```
+
+```
+## # Comparison of Model Performance Indices
+## 
+## Name                    |     Model | AIC (weights) | AICc (weights) | BIC (weights) |  RMSE | Sigma |    R2 | R2 (adj.) | Tjur's R2 | Log_loss | Score_log | Score_spherical |   PCP
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ols_imp2                |        lm | 746.2 (<.001) |  746.2 (<.001) | 765.4 (<.001) | 0.365 | 0.365 | 0.468 |     0.467 |           |          |           |                 |      
+## ols_robust              | lm_robust | 746.2 (<.001) |  746.2 (<.001) | 765.4 (<.001) | 0.365 | 0.365 | 0.468 |     0.467 |           |          |           |                 |      
+## minimal2_logistic_model |       glm | 636.2 (>.999) |  636.3 (>.999) | 650.6 (>.999) | 0.320 | 0.838 |       |           |     0.574 |    0.350 |      -Inf |           0.008 | 0.787
+```
+
+```r
+plot(compare_performance(ols_imp2, minimal2_logistic_model, rank = TRUE, verbose = FALSE))
+```
+
+![](presentation_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
+
+```r
+accuracies
+```
+
+```
+##                     Model Accuracy
+## 1                logistic 85.77778
+## 2            imp_logistic 85.33333
+## 3    minimal_logit_extent 70.77778
+## 4 minimal_logit_perimeter 86.44444
+## 5                     lpm 86.22222
+## 6                 lpm_rob 86.22222
+```
+
+
+## We now performe some actual statistical learning
+#### We split our data in train and test set
 
 
 ```r
@@ -154,7 +831,7 @@ mse = function(predictions,data,y){
 
 ```r
 # Fit the linear regression model
-ols = lm("Class ~ .",data=train)
+ols = lm("Class ~ Perimeter + Eccentricity",data=train)
 # Summary of the model
 print(summary(ols))
 ```
@@ -162,28 +839,23 @@ print(summary(ols))
 ```
 ## 
 ## Call:
-## lm(formula = "Class ~ .", data = train)
+## lm(formula = "Class ~ Perimeter + Eccentricity", data = train)
 ## 
 ## Residuals:
 ##      Min       1Q   Median       3Q      Max 
-## -1.14592 -0.23372  0.01838  0.25465  0.69993 
+## -0.99737 -0.29624  0.05971  0.27956  1.33647 
 ## 
 ## Coefficients:
-##                   Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)      3.690e+00  4.534e-01   8.139 2.18e-15 ***
-## Area            -3.371e-05  6.771e-06  -4.978 8.31e-07 ***
-## MajorAxisLength  2.259e-03  1.311e-03   1.723   0.0854 .  
-## MinorAxisLength  5.358e-05  1.732e-03   0.031   0.9753    
-## Eccentricity    -8.676e-01  3.385e-01  -2.563   0.0106 *  
-## ConvexArea       4.475e-05  6.781e-06   6.599 8.89e-11 ***
-## Extent           8.826e-03  3.186e-01   0.028   0.9779    
-## Perimeter       -3.969e-03  6.719e-04  -5.907 5.73e-09 ***
+##                Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   2.491e+00  1.256e-01  19.836  < 2e-16 ***
+## Perimeter    -1.115e-03  5.709e-05 -19.525  < 2e-16 ***
+## Eccentricity -8.843e-01  1.762e-01  -5.019 6.79e-07 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## Residual standard error: 0.3445 on 622 degrees of freedom
-## Multiple R-squared:  0.5313,	Adjusted R-squared:  0.526 
-## F-statistic: 100.7 on 7 and 622 DF,  p-value: < 2.2e-16
+## Residual standard error: 0.3584 on 627 degrees of freedom
+## Multiple R-squared:  0.4887,	Adjusted R-squared:  0.4871 
+## F-statistic: 299.7 on 2 and 627 DF,  p-value: < 2.2e-16
 ```
 
 
@@ -194,7 +866,7 @@ ols_test_predictions = predict.lm(ols,newdata = test)
 hist(fitted(ols))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-31-1.png)<!-- -->
 
 ```r
 # Calculate MSE for the training data
@@ -203,17 +875,17 @@ mse_train
 ```
 
 ```
-## [1] 0.1171742
+## [1] 0.1278151
 ```
 
 ```r
 # Calculate MSE for the test data
 mse_test<-mse(ols_test_predictions,test,"Class") #test error
-mse_test
+mse_test # it was 0.1346953 before changing variables # it's 0.145 after reducing the model
 ```
 
 ```
-## [1] 0.1346953
+## [1] 0.1453523
 ```
 
 ### 2. ROBUST OLS
@@ -258,7 +930,7 @@ ols_robust_test_predictions = predict(ols_robust, newdata = test)
 hist(fitted(ols_robust))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
 
 ```r
 # Calculate MSE for the training data
@@ -285,38 +957,33 @@ mse(ols_robust_test_predictions, test, "Class") #test error
 library(broom)
 
 # 3. Logistic
-logistic = glm(Class ~ ., data = train, family = binomial(link = 'logit'))
+logistic = glm(Class ~ Perimeter + Eccentricity, data = train, family = binomial(link = 'logit'))
 tidy(logistic)
 ```
 
 ```
-## # A tibble: 8 × 5
-##   term              estimate std.error statistic p.value
-##   <chr>                <dbl>     <dbl>     <dbl>   <dbl>
-## 1 (Intercept)     -13.3       8.67       -1.54   0.124  
-## 2 Area              0.000473  0.000228    2.08   0.0377 
-## 3 MajorAxisLength   0.0184    0.0222      0.831  0.406  
-## 4 MinorAxisLength   0.113     0.0355      3.18   0.00147
-## 5 Eccentricity     12.1       5.07        2.40   0.0166 
-## 6 ConvexArea       -0.000706  0.000226   -3.12   0.00179
-## 7 Extent           -0.135     3.55       -0.0381 0.970  
-## 8 Perimeter        -0.0100    0.00926    -1.09   0.278
+## # A tibble: 3 × 5
+##   term         estimate std.error statistic  p.value
+##   <chr>           <dbl>     <dbl>     <dbl>    <dbl>
+## 1 (Intercept)   19.3      1.78        10.8  3.03e-27
+## 2 Perimeter     -0.0124   0.00109    -11.4  5.86e-30
+## 3 Eccentricity  -6.79     1.81        -3.76 1.72e- 4
 ```
 
 ```r
 hist(fitted(logistic))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
 
 ```r
 #logistic by hand
 logistic_test_predictions = predict(logistic, newdata = test)
-mse(fitted(logistic), train, "Class")
+mse(fitted(logistic), train, "Class") # 0.09080575 before <- 0.09835077 after 
 ```
 
 ```
-## [1] 0.09080575
+## [1] 0.09835077
 ```
 
 ```r
@@ -324,12 +991,29 @@ mse(logistic_test_predictions, test, "Class")
 ```
 
 ```
-## [1] 37.4428
+## [1] 12.18564
 ```
 
 ### 4. RIDGE
 
-![](presentation_files/figure-html/unnamed-chunk-13-1.png)<!-- -->
+
+```r
+library(glmnet)
+X = model.matrix(Class~.-1, data = train)
+y=train$Class
+ridge=glmnet(X,y,alpha=0)
+#ridge$beta
+plot(ridge,xvar="lambda", label = TRUE) # Extent(4) and Eccentricity (6) are the variables kept
+```
+
+![](presentation_files/figure-html/unnamed-chunk-34-1.png)<!-- -->
+
+```r
+ridge_fitted = predict(ridge, newx = X) # fitted value for the training set using the best lambda value automatically selected by the function
+ridge_predicted = predict(ridge, newx = model.matrix(Class~.-1, data = test)) # fitted value for the training set using the best lambda value automatically selected by the function
+cv.ridge=cv.glmnet(X,y,alpha=0)
+coef(cv.ridge)
+```
 
 ```
 ## 8 x 1 sparse Matrix of class "dgCMatrix"
@@ -344,14 +1028,31 @@ mse(logistic_test_predictions, test, "Class")
 ## Perimeter       -2.457501e-04
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-13-2.png)<!-- -->
+```r
+plot(cv.ridge) # cv mse of the ridge
+```
+
+![](presentation_files/figure-html/unnamed-chunk-34-2.png)<!-- -->
+
+```r
+cv.ridge_predicted = predict(cv.ridge, newx = X)
+mse(ridge_fitted, train, "Class") # training error of the ridge
+```
 
 ```
 ## [1] 0.25
 ```
 
+```r
+mse(ridge_predicted, test, "Class") # test error of the ridge
+```
+
 ```
 ## [1] 0.25
+```
+
+```r
+mse(cv.ridge_predicted, test, "Class") # cv test error of the ridge
 ```
 
 ```
@@ -360,7 +1061,28 @@ mse(logistic_test_predictions, test, "Class")
 
 ### 5. LASSO
 
-![](presentation_files/figure-html/unnamed-chunk-14-1.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-14-2.png)<!-- -->
+
+```r
+# Fit the lasso regression model
+fit.lasso=glmnet(X,y)
+# Plot the lasso coefficients
+plot(fit.lasso,xvar="lambda",label=TRUE)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-35-1.png)<!-- -->
+
+```r
+# Perform cross-validation for lasso regression
+cv.lasso=cv.glmnet(X,y)
+# Extract the coefficients from cross-validation
+plot(cv.lasso)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-35-2.png)<!-- -->
+
+```r
+coef(cv.lasso)
+```
 
 ```
 ## 8 x 1 sparse Matrix of class "dgCMatrix"
@@ -375,18 +1097,83 @@ mse(logistic_test_predictions, test, "Class")
 ## Perimeter       -1.181177e-03
 ```
 
+```r
+# Calculate mean squared error for the training data
+#mse(fit.lasso, raisins, "Class")
+##Predict using the lasso regression model
+#predict(fit.lasso,newx = X)
+#
+```
+
 ### 6. TREE
 
-![](presentation_files/figure-html/unnamed-chunk-15-1.png)<!-- -->
+
+```r
+library(tree)
+# Fit the decision tree model
+tree = tree(Class ~ ., data = raisins)
+# Plot the decision tree
+plot(tree)
+text(tree)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-36-1.png)<!-- -->
+
+```r
+tree_test_predictions = predict(tree, newdata = test, type = "tree")
+
+# Make predictions on the training data
+tree_predictions = predict(tree, newdata = train[,-8], type = "tree")
+
+# Calculate mean squared error for the test data
+#mse(tree_test_predictions, test, "Class")
+
+#plot carino
+#valutarlo : prendere predizioni e calcolare mse su training e test
+#confusion matrix
+```
 
 ### 7. KNN
 
-
 ```
-## [1] "Best K value: 5"
-```
+# Scaling
+train.array <- scale(train[, 1:7])
+test.array<- scale(test[, 1:7])
+# Labels
+training_labels=train$Class
+# KNN Model 
+k_values <- 1:50
+accuracy_scores <- numeric(length(k_values))
 
-![](presentation_files/figure-html/unnamed-chunk-16-1.png)<!-- -->
+for (i in seq_along(k_values)) {
+  #KNN model
+  classifier_knn <- knn(train, test, cl = training_labels, k = k_values[i])
+  
+  # Convert to factors
+  classifier_knn <- as.factor(classifier_knn)
+  actual_labels <- as.factor(test$Class)
+  
+  #Accuracy
+  cm <- confusionMatrix(classifier_knn, actual_labels)
+  accuracy_scores[i] <- cm$overall["Accuracy"]
+}
+
+# Best K value 
+best_k <- k_values[which.max(accuracy_scores)]
+
+#print(paste("Accuracy scores:", accuracy_scores))
+print(paste("Best K value:", best_k))
+
+#Data frame with K values and accuracy
+k_values_results <- data.frame(K = k_values, Accuracy = accuracy_scores)
+# Plot
+ggplot(k_values_results, aes(x = K, y = 1 - Accuracy)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "K", y = "Test Error") +
+  ggtitle("Test Error vs K") +
+  theme_minimal()
+```
 
 # Unsupervised models
 
@@ -489,14 +1276,14 @@ summary(pr.out)
 fviz_eig(pr.out, addlabels = TRUE, ylim = c(0, 70), main = "Scree Plot of PCA")
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-23-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-43-1.png)<!-- -->
 
 ```r
 fviz_pca_var(pr.out, col.var = "blue", col.quanti.sup = "red", 
              addlabels = TRUE, repel = TRUE)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-23-2.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-43-2.png)<!-- -->
 
 
 
@@ -507,7 +1294,7 @@ arrows(0, 0, pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, length = 0.1, angle
 text(pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, labels = rownames(pr.out[[2]]), pos = 3)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-24-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-44-1.png)<!-- -->
 
 
 ```r
@@ -543,45 +1330,45 @@ km.out
 ```
 
 ```
-## K-means clustering with 2 clusters of sizes 189, 711
+## K-means clustering with 2 clusters of sizes 711, 189
 ## 
 ## Cluster means:
 ##        Area MajorAxisLength MinorAxisLength Eccentricity ConvexArea    Extent
-## 1 150233.37        605.4126        322.4120    0.8333862  156300.93 0.6945978
-## 2  71209.01        384.5485        236.4324    0.7677608   73877.08 0.7008132
+## 1  71209.01        384.5485        236.4324    0.7677608   73877.08 0.7008132
+## 2 150233.37        605.4126        322.4120    0.8333862  156300.93 0.6945978
 ##   Perimeter
-## 1  1583.103
-## 2  1055.006
+## 1  1055.006
+## 2  1583.103
 ## 
 ## Clustering vector:
-##   [1] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-##  [38] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-##  [75] 2 2 2 2 2 2 2 2 2 2 2 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [112] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [149] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [186] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [223] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [260] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 2 2 2 2 2
-## [297] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [334] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [371] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [408] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [445] 2 2 2 2 2 2 1 1 2 2 2 1 1 1 1 2 2 2 1 2 1 2 2 1 1 1 2 1 2 1 2 1 1 2 1 1 1
-## [482] 2 1 2 1 2 2 1 2 2 1 2 2 2 2 1 1 2 1 2 1 1 2 1 2 2 1 1 1 1 2 2 2 2 1 1 1 2
-## [519] 2 2 1 2 1 1 2 1 2 1 1 2 2 2 2 1 1 2 2 2 1 2 1 1 1 1 2 2 2 1 1 2 2 2 1 2 2
-## [556] 1 2 2 2 1 1 1 2 1 2 1 1 1 1 2 2 2 2 1 1 1 2 1 1 1 1 1 1 1 2 2 1 2 1 2 1 2
-## [593] 1 1 1 2 2 2 2 1 2 1 2 1 2 1 2 2 2 1 2 2 1 1 2 2 1 1 2 2 2 1 1 1 2 2 2 2 2
-## [630] 2 2 2 2 2 1 2 2 1 2 2 2 1 2 2 1 1 2 2 2 1 1 2 2 2 1 2 1 1 2 2 2 1 2 2 2 2
-## [667] 1 2 1 2 1 1 2 2 2 1 2 1 1 1 2 1 2 2 2 2 2 1 2 2 2 1 1 2 1 2 2 2 2 1 1 1 1
-## [704] 1 1 2 2 2 1 2 2 1 2 2 2 2 2 2 2 2 2 2 1 2 2 2 2 1 2 2 2 2 2 2 2 1 1 2 1 2
-## [741] 2 1 2 2 2 2 1 1 2 2 2 1 2 2 1 1 1 2 2 1 1 2 2 2 2 1 2 1 1 1 1 1 2 2 2 2 1
-## [778] 1 1 2 2 1 2 2 2 2 1 2 1 2 2 1 2 2 2 2 2 2 2 2 1 1 2 1 1 2 1 2 2 2 1 2 1 1
-## [815] 2 1 2 2 2 2 1 1 2 2 2 2 2 2 2 1 1 2 2 2 1 2 1 1 2 2 2 2 2 2 2 1 2 1 2 2 2
-## [852] 2 2 1 2 1 1 1 2 1 1 2 2 2 1 1 1 2 1 2 1 2 2 2 2 2 1 1 1 2 1 1 2 1 2 2 1 2
-## [889] 2 2 2 2 1 1 1 2 2 2 2 2
+##   [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+##  [38] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+##  [75] 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [112] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [149] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [186] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [223] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [260] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1
+## [297] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [334] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [371] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [408] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [445] 1 1 1 1 1 1 2 2 1 1 1 2 2 2 2 1 1 1 2 1 2 1 1 2 2 2 1 2 1 2 1 2 2 1 2 2 2
+## [482] 1 2 1 2 1 1 2 1 1 2 1 1 1 1 2 2 1 2 1 2 2 1 2 1 1 2 2 2 2 1 1 1 1 2 2 2 1
+## [519] 1 1 2 1 2 2 1 2 1 2 2 1 1 1 1 2 2 1 1 1 2 1 2 2 2 2 1 1 1 2 2 1 1 1 2 1 1
+## [556] 2 1 1 1 2 2 2 1 2 1 2 2 2 2 1 1 1 1 2 2 2 1 2 2 2 2 2 2 2 1 1 2 1 2 1 2 1
+## [593] 2 2 2 1 1 1 1 2 1 2 1 2 1 2 1 1 1 2 1 1 2 2 1 1 2 2 1 1 1 2 2 2 1 1 1 1 1
+## [630] 1 1 1 1 1 2 1 1 2 1 1 1 2 1 1 2 2 1 1 1 2 2 1 1 1 2 1 2 2 1 1 1 2 1 1 1 1
+## [667] 2 1 2 1 2 2 1 1 1 2 1 2 2 2 1 2 1 1 1 1 1 2 1 1 1 2 2 1 2 1 1 1 1 2 2 2 2
+## [704] 2 2 1 1 1 2 1 1 2 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 2 1 1 1 1 1 1 1 2 2 1 2 1
+## [741] 1 2 1 1 1 1 2 2 1 1 1 2 1 1 2 2 2 1 1 2 2 1 1 1 1 2 1 2 2 2 2 2 1 1 1 1 2
+## [778] 2 2 1 1 2 1 1 1 1 2 1 2 1 1 2 1 1 1 1 1 1 1 1 2 2 1 2 2 1 2 1 1 1 2 1 2 2
+## [815] 1 2 1 1 1 1 2 2 1 1 1 1 1 1 1 2 2 1 1 1 2 1 2 2 1 1 1 1 1 1 1 2 1 2 1 1 1
+## [852] 1 1 2 1 2 2 2 1 2 2 1 1 1 2 2 2 1 2 1 2 1 1 1 1 1 2 2 2 1 2 2 1 2 1 1 2 1
+## [889] 1 1 1 1 2 2 2 1 1 1 1 1
 ## 
 ## Within cluster sum of squares by cluster:
-## [1] 345272914401 569761126243
+## [1] 569761126243 345272914401
 ##  (between_SS / total_SS =  68.0 %)
 ## 
 ## Available components:
@@ -590,7 +1377,7 @@ km.out
 ## [6] "betweenss"    "size"         "iter"         "ifault"
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-47-1.png)<!-- -->
 
 ### 3. Clustering su PCA
 
@@ -602,45 +1389,45 @@ km.out2
 ```
 
 ```
-## K-means clustering with 2 clusters of sizes 251, 649
+## K-means clustering with 2 clusters of sizes 649, 251
 ## 
 ## Cluster means:
 ##         PC1         PC2         PC3          PC4         PC5           PC6
-## 1  2.885072 -0.04701092 -0.04097781  0.015444995 -0.02644917  0.0020594378
-## 2 -1.115798  0.01818142  0.01584812 -0.005973334  0.01022919 -0.0007964852
+## 1 -1.115798  0.01818142  0.01584812 -0.005973334  0.01022919 -0.0007964852
+## 2  2.885072 -0.04701092 -0.04097781  0.015444995 -0.02644917  0.0020594378
 ##            PC7
-## 1  0.004365184
-## 2 -0.001688230
+## 1 -0.001688230
+## 2  0.004365184
 ## 
 ## Clustering vector:
-##   [1] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-##  [38] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 2 2 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-##  [75] 2 2 2 2 2 2 2 2 2 2 2 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [112] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 2 2 2 2 2 2 2 2
-## [149] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [186] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [223] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [260] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 2 2 2 2 2
-## [297] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [334] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [371] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [408] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-## [445] 2 2 2 2 2 2 1 1 2 2 2 1 1 1 1 2 1 2 1 2 1 2 1 1 1 1 2 1 1 1 2 1 1 1 1 1 1
-## [482] 2 1 2 1 2 1 1 2 2 1 2 2 2 2 1 1 2 1 1 1 1 2 1 2 1 1 1 1 1 2 2 2 2 1 1 1 2
-## [519] 2 2 1 2 1 1 2 1 2 1 1 2 2 1 2 1 1 2 2 2 1 1 1 1 1 1 1 2 2 1 1 2 2 2 1 2 2
-## [556] 1 2 2 2 1 1 1 2 1 1 1 1 1 1 2 1 2 2 1 1 1 1 1 1 1 1 1 1 1 1 2 1 2 1 1 1 1
-## [593] 1 1 1 2 2 1 2 1 2 1 2 1 2 1 2 2 1 1 2 2 1 1 2 1 1 1 1 1 2 1 1 1 2 2 1 1 1
-## [630] 2 2 2 2 2 1 2 1 1 1 2 2 1 2 1 1 1 2 2 2 1 1 1 2 2 1 2 1 1 2 2 2 1 2 2 1 2
-## [667] 1 1 1 2 1 1 2 1 2 1 2 1 1 1 2 1 1 2 2 2 2 1 2 2 2 1 1 2 1 2 2 2 2 1 1 1 1
-## [704] 1 1 2 2 2 1 1 2 1 2 1 2 2 1 2 2 1 2 2 1 2 2 2 2 1 2 2 2 2 1 1 2 1 1 2 1 2
-## [741] 1 1 1 1 2 2 1 1 2 2 1 1 2 2 1 1 1 2 2 1 1 2 1 1 2 1 2 1 1 1 1 1 2 1 2 2 1
-## [778] 1 1 1 2 1 2 1 2 2 1 1 1 2 1 1 2 2 1 2 2 2 2 2 1 1 2 1 1 2 1 2 2 1 1 2 1 1
-## [815] 2 1 2 2 2 2 1 1 2 1 1 2 2 2 2 1 1 2 2 2 1 2 1 1 2 2 2 2 1 2 2 1 2 1 2 2 1
-## [852] 2 2 1 2 1 1 1 2 1 1 2 1 2 1 1 1 2 1 2 1 1 2 2 2 2 1 1 1 2 1 1 1 1 1 2 1 2
-## [889] 2 2 2 1 1 1 1 2 2 2 2 2
+##   [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+##  [38] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+##  [75] 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [112] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1
+## [149] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [186] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [223] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [260] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1
+## [297] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [334] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [371] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [408] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+## [445] 1 1 1 1 1 1 2 2 1 1 1 2 2 2 2 1 2 1 2 1 2 1 2 2 2 2 1 2 2 2 1 2 2 2 2 2 2
+## [482] 1 2 1 2 1 2 2 1 1 2 1 1 1 1 2 2 1 2 2 2 2 1 2 1 2 2 2 2 2 1 1 1 1 2 2 2 1
+## [519] 1 1 2 1 2 2 1 2 1 2 2 1 1 2 1 2 2 1 1 1 2 2 2 2 2 2 2 1 1 2 2 1 1 1 2 1 1
+## [556] 2 1 1 1 2 2 2 1 2 2 2 2 2 2 1 2 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 2 1 2 2 2 2
+## [593] 2 2 2 1 1 2 1 2 1 2 1 2 1 2 1 1 2 2 1 1 2 2 1 2 2 2 2 2 1 2 2 2 1 1 2 2 2
+## [630] 1 1 1 1 1 2 1 2 2 2 1 1 2 1 2 2 2 1 1 1 2 2 2 1 1 2 1 2 2 1 1 1 2 1 1 2 1
+## [667] 2 2 2 1 2 2 1 2 1 2 1 2 2 2 1 2 2 1 1 1 1 2 1 1 1 2 2 1 2 1 1 1 1 2 2 2 2
+## [704] 2 2 1 1 1 2 2 1 2 1 2 1 1 2 1 1 2 1 1 2 1 1 1 1 2 1 1 1 1 2 2 1 2 2 1 2 1
+## [741] 2 2 2 2 1 1 2 2 1 1 2 2 1 1 2 2 2 1 1 2 2 1 2 2 1 2 1 2 2 2 2 2 1 2 1 1 2
+## [778] 2 2 2 1 2 1 2 1 1 2 2 2 1 2 2 1 1 2 1 1 1 1 1 2 2 1 2 2 1 2 1 1 2 2 1 2 2
+## [815] 1 2 1 1 1 1 2 2 1 2 2 1 1 1 1 2 2 1 1 1 2 1 2 2 1 1 1 1 2 1 1 2 1 2 1 1 2
+## [852] 1 1 2 1 2 2 2 1 2 2 1 2 1 2 2 2 1 2 1 2 2 1 1 1 1 2 2 2 1 2 2 2 2 2 1 2 1
+## [889] 1 1 1 2 2 2 2 1 1 1 1 1
 ## 
 ## Within cluster sum of squares by cluster:
-## [1] 1355.248 2038.821
+## [1] 2038.821 1355.248
 ##  (between_SS / total_SS =  46.1 %)
 ## 
 ## Available components:
@@ -649,4 +1436,4 @@ km.out2
 ## [6] "betweenss"    "size"         "iter"         "ifault"
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-29-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-49-1.png)<!-- -->

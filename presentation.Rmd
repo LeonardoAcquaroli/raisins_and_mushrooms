@@ -56,6 +56,13 @@ library(e1071)
 library(caTools)
 library(class)
 library(pROC)
+library(tree)
+library(leaps)   # best subset
+library(bestglm) # best subset for logistic
+library(MASS)    # diagnostics
+library(olsrr)   # diagnostics
+library(influence.ME)
+library(DHARMa)
 ```
 
 #### Loading data-set
@@ -169,7 +176,273 @@ ggtitle(paste0("Comparison between Perimeter's distribution" ))
 
 # Supervised models
 
-#### Splitting train and test test
+## We first use all the dataset
+
+#### We run a basic ols model, which would be a linear probability model
+```{r}
+ols <- lm("Class ~ .",data=raisins)
+summary(ols)
+```
+
+#### We check for heteroscedasticity and multicollinearity
+```{r}
+check_heteroscedasticity(ols) # there is heteroskedasticity
+check_model(ols)
+vif(ols)
+sqrt(vif(ols)) > 2
+```
+#### There appears to be heteroscedacity, plus the multicollinearity is extremely high
+
+#### We try to tackle multicollinearity by reducing the variables in the model. We use best subset selection.
+```{r, fig.align='center'}
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=7)
+reg.summary=summary(regfit.full)
+plot(reg.summary$cp,xlab="Number of Variables",ylab="Cp")
+which.min(reg.summary$cp)
+plot(regfit.full,scale="Cp")
+```
+
+#### As we can see, the best model appears to be one with 5 variables. We run this improved ols model
+```{r}
+ols_imp <- lm("Class ~ Area + MajorAxisLength + 
+              Eccentricity + ConvexArea + Perimeter",data=raisins)
+summary(ols_imp)
+vif(ols_imp) # the VIF is still too high!
+```
+#### the VIF is extremely high. 
+#### Given that most of our variables are highly correlated, we identify three "proper" dimensions over which our data span.
+#### Thus, we perform best subset selection specifying that we want at most 3 variables
+```{r, fig.align='center'}
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=3)
+reg.summary=summary(regfit.full)
+plot(regfit.full,scale="Cp")
+```
+
+#### We observe that two variables are very similar. Thus, we opt for the minimal model with two variables.
+
+```{r}
+ols_imp2 <- lm("Class ~ Eccentricity + Perimeter",data=raisins)
+summary(ols_imp2)
+vif(ols_imp2)
+check_model(ols_imp2)
+```
+
+#### ols_imp2 is our final model as far as linear regression goes. We now focus on its residuals.
+
+```{r}
+raw_res <- residuals(ols_imp2)
+threshold <- 3 * sd(raw_res)  # Define threshold as 3 times the SD
+threshold# how are the residuals distributed?
+hist(raw_res, breaks = 30, main = "Histogram of Raw Residuals", xlab = "Raw Residuals")
+
+```
+
+#### We also compute Cook's distance and plot it with the residuals
+
+```{r}
+cooks_dist <- cooks.distance(ols_imp2)
+cooks_threshold <- 4/897
+plot(cooks_dist, raw_res, main = "Cook's Distance vs. Raw Residuals",
+     xlab = "Cook's Distance", ylab = "Raw Residuals")
+abline(h = 0, lty = 2, col = "red")  # Reference line at y = 0
+abline(h = threshold, lty = 3, col = "blue")  # Threshold line for raw residuals (upper)
+abline(h = -threshold, lty = 3, col = "blue")  # Threshold line for raw residuals (lower)
+abline(v = cooks_threshold, lty = 3, col = "green")
+text(cooks_dist, raw_res, labels = 1:length(cooks_dist), pos = 3)
+```
+
+#### The most problematic observations appear to be: 695, 507, 837, 291, 86, 488. We should dig deeper into them.
+```{r, fig.align='center'}
+outliers_obs <- c(695, 507, 837, 291, 86, 488)
+outliers_df <- raisins[outliers_obs, ]
+non_outliers_df <- raisins[-outliers_obs, ]
+
+# Plot without outliers
+p <- ggplot(non_outliers_df, aes(x = Perimeter, y = Eccentricity)) +
+  geom_point() +
+  labs(title = "Scatter Plot emphasising outliers",
+       x = "Perimeter",
+       y = "Eccentricity")
+
+# Add outliers with distinct color
+p <- p +
+  geom_point(data = outliers_df, color = "red", size = 3) +
+  geom_text(data = outliers_df, aes(label = paste(rownames(outliers_df))), vjust = -1)
+
+# Median values
+p <- p +
+  geom_vline(aes(xintercept = median(Perimeter)), linetype = "dashed") +
+  geom_hline(aes(yintercept = median(Eccentricity)), linetype = "dashed")
+
+# Regression line
+p <- p +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(data = non_outliers_df, method = "lm", se = FALSE, linetype = "dashed", color = "blue")
+
+# Display the plot
+print(p)
+
+```
+
+#### These observations clearly have a very large "Perimeter", however they do not appear to be completely out of this world. <br> We can still try to remove them and see how the performance changes. <br> We now plot the accuracy of our model on the whole dataset
+
+
+
+```{r}
+#computation of the accuracy on the full dataset
+fitvols_fulld = predict(ols_imp2, raisins) # fulld identifies the full dataset
+predols_fulld = ifelse(fitvols_fulld < 0.50, 0, 1)
+accols_fulld = raisins$Class == predols_fulld
+table(accols_fulld)
+accuracy_ols_fulld <- 776/900
+accuracy_ols_fulld
+```
+
+#### Given that we found heteroscedasticity, we perform the same model with the robust option.
+
+```{r} 
+#ROBUST OLS
+ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
+summary(ols_robust)
+```
+#### We compute the accuracy as we did before
+```{r}
+fitvolsrob_fulld = predict(ols_robust, raisins) # fulld identifies the full dataset
+predolsrob_fulld = ifelse(fitvolsrob_fulld < 0.50, 0, 1)
+accolsrob_fulld = raisins$Class == predolsrob_fulld
+table(accolsrob_fulld)
+accuracy_olsrob_fulld <- 776/900
+accuracy_olsrob_fulld
+
+```
+#### We now remove the "outliers" from the dataset and preform the very same models.
+
+```{r}
+raisins_noout <- raisins[!(row.names(raisins) %in% c(695, 507, 837, 291, 86, 488)), ]
+```
+
+#### First the "normal" model
+```{r}
+ols_imp2_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no outliers
+summary(ols_imp2_n)
+fitvols_fulld_n = predict(ols_imp2_n, raisins_noout) # fulld identifies the full dataset
+predols_fulld_n = ifelse(fitvols_fulld_n < 0.50, 0, 1)
+accols_fulld_n = raisins_noout$Class == predols_fulld_n
+table(accols_fulld_n)
+accuracy_ols_fulld_n <- 772/894
+accuracy_ols_fulld_n
+```
+#### Then the robust one
+
+```{r}
+ols_rob_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no-outliers
+summary(ols_rob_n)
+fitvolsrob_fulld_n = predict(ols_rob_n, raisins_noout) # fulld identifies the full dataset
+predolsrob_fulld_n = ifelse(fitvolsrob_fulld_n < 0.50, 0, 1)
+accolsrob_fulld_n = raisins_noout$Class == predolsrob_fulld_n
+table(accolsrob_fulld_n)
+accuracy_olsrob_fulld_n <- 772/894
+accuracy_olsrob_fulld_n
+```
+
+
+### We now move to logistic regression
+
+```{r, fig.align='center'}
+logistic_model <-  glm(Class ~ ., data = raisins, family = binomial(link = 'logit'))
+tidy(logistic_model)
+vif(logistic_model)
+hist(fitted(logistic_model))
+```
+
+#### We perform best subset selection on the logistic model as well
+```{r}
+bestglm(raisins, family = gaussian, IC = "BIC")
+imp_logistic_model <- glm(Class ~ Area + ConvexArea + Perimeter, 
+                    data = raisins, 
+                    family = binomial(link = 'logit'))
+vif(imp_logistic_model)
+```
+
+####  These still appears to have multicollinearity issues.
+#### As before, we use our intuition to build a minimal logistic model
+#### We actually build two of them:
+
+```{r}
+minimal1_logistic_model <-  glm(Class ~ Extent + Eccentricity, data = raisins, family = binomial(link = 'logit'))
+vif(minimal1_logistic_model)
+
+minimal2_logistic_model <-  glm(Class ~ Eccentricity + Perimeter, data = raisins,family = binomial(link = 'logit'))
+vif(minimal2_logistic_model)
+```
+
+#### We now create a table with the accuracies of all our models
+```{r}
+accuracies <- data.frame(Model = character(),
+                         Accuracy = numeric())
+
+models <- list(logistic = logistic_model, 
+               imp_logistic = imp_logistic_model,
+               minimal_logit_extent = minimal1_logistic_model,
+               minimal_logit_perimeter = minimal2_logistic_model,
+               lpm = ols_imp2,
+               lpm_rob = ols_robust)
+
+for (model_name in names(models)) {
+  model <- models[[model_name]]
+  
+  # Predict the outcome probabilities using the logistic regression model
+  pred_pr <- predict(model, raisins, type = "response")
+  # Convert the predicted probabilities to binary predictions (0 or 1)
+  pred_val <- ifelse(pred_pr > 0.5, 1, 0)
+  # Compare the predicted values with the actual outcome variable
+  actual_values <- raisins$Class
+  # Compute the number of correctly predicted values
+  correctly_pred <- sum(pred_val == actual_values)
+  # Compute the percentage of correctly predicted values
+  accuracy <- correctly_pred / length(actual_values) * 100
+  # Append the accuracy to the "accuracies" data frame
+  accuracies <- rbind(accuracies, data.frame(Model = model_name, Accuracy = accuracy))
+}
+
+accuracies
+```
+
+#### Since the minimal logisitc model with the perimeter is the best one, we compute diagnostics on it.
+```{r}
+predicted_probs_logit <- predict(minimal2_logistic_model, type = "response")
+residuals_logit <- raisins$Class - predicted_probs_logit
+
+plot(predicted_probs_logit, raisins$Class, xlab = "Predicted Probabilities", ylab = "Observed Responses",
+     main = "Observed vs. Predicted Probabilities", pch = 16)
+
+#check relations with each predictor
+plot(raisins$Eccentricity, residuals_logit, xlab = "Eccentricity", ylab = "Standardized Residuals",
+     main = "Standardized Residuals vs. Predictor 1", pch = 16)
+plot(raisins$Perimeter, residuals_logit, xlab = "Perimeter", ylab = "Standardized Residuals",
+     main = "Standardized Residuals vs. Predictor 1", pch = 16)
+
+# Diagnostics with DHARMa
+
+# Create a simulated residuals object
+simulated_residuals <- simulateResiduals(minimal2_logistic_model, n = 100)
+# Plot standardized residuals using DHARMa's built-in diagnostic plots
+plot(simulated_residuals)
+```
+
+### Comparison of all the models so far
+
+```{r}
+# Compare all the models
+compare_performance(ols_imp2, ols_robust, minimal2_logistic_model)
+plot(compare_performance(ols_imp2, minimal2_logistic_model, rank = TRUE, verbose = FALSE))
+
+accuracies
+```
+
+
+## We now performe some actual statistical learning
+#### We split our data in train and test set
 
 ```{r}
 library(caret)
@@ -199,7 +472,7 @@ mse = function(predictions,data,y){
 
 ```{r}
 # Fit the linear regression model
-ols = lm("Class ~ .",data=train)
+ols = lm("Class ~ Perimeter + Eccentricity",data=train)
 # Summary of the model
 print(summary(ols))
 ```
@@ -214,7 +487,7 @@ mse_train<-mse(fitted(ols), train, "Class") #training error
 mse_train
 # Calculate MSE for the test data
 mse_test<-mse(ols_test_predictions,test,"Class") #test error
-mse_test
+mse_test # it was 0.1346953 before changing variables # it's 0.145 after reducing the model
 ```
 
 ### 2. ROBUST OLS
@@ -244,18 +517,18 @@ mse(ols_robust_test_predictions, test, "Class") #test error
 library(broom)
 
 # 3. Logistic
-logistic = glm(Class ~ ., data = train, family = binomial(link = 'logit'))
+logistic = glm(Class ~ Perimeter + Eccentricity, data = train, family = binomial(link = 'logit'))
 tidy(logistic)
 hist(fitted(logistic))
 #logistic by hand
 logistic_test_predictions = predict(logistic, newdata = test)
-mse(fitted(logistic), train, "Class")
+mse(fitted(logistic), train, "Class") # 0.09080575 before <- 0.09835077 after 
 mse(logistic_test_predictions, test, "Class")
 ```
 
 ### 4. RIDGE
 
-```{r, echo=FALSE}
+```{r}
 library(glmnet)
 X = model.matrix(Class~.-1, data = train)
 y=train$Class
@@ -275,7 +548,7 @@ mse(cv.ridge_predicted, test, "Class") # cv test error of the ridge
 
 ### 5. LASSO
 
-```{r, echo=FALSE}
+```{r}
 # Fit the lasso regression model
 fit.lasso=glmnet(X,y)
 # Plot the lasso coefficients
@@ -294,7 +567,7 @@ coef(cv.lasso)
 
 ### 6. TREE
 
-```{r, echo=FALSE}
+```{r}
 library(tree)
 # Fit the decision tree model
 tree = tree(Class ~ ., data = raisins)
@@ -317,7 +590,7 @@ tree_predictions = predict(tree, newdata = train[,-8], type = "tree")
 
 ### 7. KNN
 
-```{r, echo=FALSE}
+```
 # Scaling
 train.array <- scale(train[, 1:7])
 test.array<- scale(test[, 1:7])

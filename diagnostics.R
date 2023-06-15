@@ -55,7 +55,6 @@ sqrt(vif(ols)) > 2 # uupsieee x2
 # Deal with correlation by using best subset selection
 regfit.full=regsubsets(Class ~.,data=raisins, nvmax=7)
 reg.summary=summary(regfit.full)
-names(reg.summary) 
 plot(reg.summary$cp,xlab="Number of Variables",ylab="Cp")
 which.min(reg.summary$cp)
 plot(regfit.full,scale="Cp")
@@ -68,7 +67,7 @@ summary(ols_imp)
 vif(ols_imp) # the VIF is still too high!
 sqrt(vif(ols_imp)) > 2
 
-regfit.full=regsubsets(Class ~.,data=raisins, nvmax=4)
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=3)
 reg.summary=summary(regfit.full)
 plot(regfit.full,scale="Cp")
 
@@ -85,7 +84,7 @@ check_heteroscedasticity(ols_imp2) # there is heteroskedasticity
 # let's apply further diagnostics
 
 raw_res <- residuals(ols_imp2)
-threshold <- 2 * sd(raw_res)  # Define threshold as 2 times the SD
+threshold <- 3 * sd(raw_res)  # Define threshold as 2 times the SD
 threshold# how are the residuals distributed?
 hist(raw_res, breaks = 30, main = "Histogram of Raw Residuals", xlab = "Raw Residuals")
 
@@ -102,12 +101,36 @@ text(cooks_dist, raw_res, labels = 1:length(cooks_dist), pos = 3)
 # wow there are a lot of outliers
 
 # most problematic observations appear to be: 695, 507, 837, 291, 86, 488
+outliers_obs <- c(695, 507, 837, 291, 86, 488)
+outliers_df <- raisins[outliers_obs, ]
+non_outliers_df <- raisins[-outliers_obs, ]
+p <- ggplot(non_outliers_df, aes(x = Perimeter, y = Eccentricity)) +
+  geom_point() +
+  labs(title = "Scatter Plot emphasising outliers",
+       x = "Perimeter",
+       y = "Eccentricity")
 
+# Add outliers with distinct color and labels
+p <- p +
+  geom_point(data = outliers_df, color = "red", size = 3) +
+  geom_text(data = outliers_df, aes(label = paste(rownames(outliers_df))), vjust = -1)
+
+# Add reference lines for median values
+p <- p +
+  geom_vline(aes(xintercept = median(Perimeter)), linetype = "dashed") +
+  geom_hline(aes(yintercept = median(Eccentricity)), linetype = "dashed")
+
+# Plot the regression line with and without outliers
+p <- p +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(data = non_outliers_df, method = "lm", se = FALSE, linetype = "dashed", color = "blue")
+
+# Display the plot
+print(p)
 
 #computation of the accuracy on the full dataset
 fitvols_fulld = predict(ols_imp2, raisins) # fulld identifies the full dataset
 predols_fulld = ifelse(fitvols_fulld < 0.50, 0, 1)
-predols_fulld 
 accols_fulld = raisins$Class == predols_fulld
 table(accols_fulld)
 accuracy_ols_fulld <- 776/900
