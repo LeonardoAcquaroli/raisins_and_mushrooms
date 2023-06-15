@@ -13,21 +13,23 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 # Description
 
-Raisins can be of two species: *Kecimen* and *Besni*.\
-We built different models to predict the species on the basis of the dimensions of the raisin example approximated as an ellipse.
+Raisins can be of two species: *Kecimen* *(Class = 1)* and *Besni (Class = 0)*.\
+We built different models to predict the species on the basis of the dimensions of the raisin example approximated as an ellipse.\
+Data are taken from the paper: <https://dergipark.org.tr/tr/download/article-file/1227592> and are available at: <https://www.kaggle.com/datasets/muratkokludataset/raisin-dataset>
 
 ## Variables
 
 The predictors that can be used are:
 
--   Area 
+-   Area
 -   MajorAxisLength
 -   MinorAxisLength
 -   Eccentricity
 -   ConvexArea
 -   Extent
 -   Perimeter
--   Class_literal
+
+The target variable is [Class.]{.underline}
 
 # Descriptive Analysis
 
@@ -87,7 +89,7 @@ raisins <- raisins[,-8]
 
 (Aim: visually represent relationships between variables)
 
-```{r, echo=FALSE}
+```{r}
 cor_table<-cor(raisins) 
 
 corrplot(cor_table, type = "upper",     #first corr plot
@@ -102,7 +104,7 @@ ggpairs(raisins_corr, columns = 1:7, ggplot2::aes(colour= Class_literal, alpha =
 
 (Aim: Identify outliers)
 
-```{r, echo=FALSE}
+```{r}
 boxplot(raisins$Area, xlab = "Area")
 boxplot(raisins$MajorAxisLength, xlab = "MajorAxisLength")
 boxplot(raisins$MinorAxisLength, xlab = "MinorAxisLength")
@@ -123,7 +125,7 @@ library(ggthemes)
 
 Black: Kecimen, Yellow: Besni
 
-```{r, echo=FALSE}
+```{r}
 theme_set(theme_economist())
 
 ggplot() +
@@ -466,6 +468,20 @@ mse = function(predictions,data,y){
 }
 ```
 
+#### Accuracy function
+
+```{r}
+# Casual Deep Learning accuracy function
+CDP_accuracy <- function(test_predictions_vector, test_set){
+        model_classes = ifelse(test_predictions_vector >= 0.5, 1,0)
+        modelCM<-table(model_classes,test_set$Class)
+        modelCM
+        model_right_guesses = modelCM[1] + modelCM[4]
+        model_accuracy = model_right_guesses/length(model_classes)
+        return(model_accuracy)
+        }
+```
+
 ## MODELS
 
 ### 1. OLS
@@ -487,7 +503,13 @@ mse_train<-mse(fitted(ols), train, "Class") #training error
 mse_train
 # Calculate MSE for the test data
 mse_test<-mse(ols_test_predictions,test,"Class") #test error
+<<<<<<< HEAD
+mse_test
+# Calculate accuracy
+CDP_accuracy(ols_test_predictions, test)
+=======
 mse_test # it was 0.1346953 before changing variables # it's 0.145 after reducing the model
+>>>>>>> 22aede16a8fe9c2a08137773b55507aac83aac28
 ```
 
 ### 2. ROBUST OLS
@@ -509,6 +531,8 @@ hist(fitted(ols_robust))
 mse(fitted(ols_robust), train, "Class") #training error
 # Calculate MSE for the test data
 mse(ols_robust_test_predictions, test, "Class") #test error
+# Calculate accuracy
+CDP_accuracy(ols_robust_test_predictions, test)
 ```
 
 ### 3. LOGISTIC
@@ -524,6 +548,7 @@ hist(fitted(logistic))
 logistic_test_predictions = predict(logistic, newdata = test)
 mse(fitted(logistic), train, "Class") # 0.09080575 before <- 0.09835077 after 
 mse(logistic_test_predictions, test, "Class")
+CDP_accuracy(logistic_test_predictions, test)
 ```
 
 ### 4. RIDGE
@@ -540,10 +565,14 @@ ridge_predicted = predict(ridge, newx = model.matrix(Class~.-1, data = test)) # 
 cv.ridge=cv.glmnet(X,y,alpha=0)
 coef(cv.ridge)
 plot(cv.ridge) # cv mse of the ridge
-cv.ridge_predicted = predict(cv.ridge, newx = X)
+cv.ridge_fitted = predict(cv.ridge, newx = X)
+cv.ridge_predicted = predict(cv.ridge, newx = model.matrix(Class~.-1, data = test))
 mse(ridge_fitted, train, "Class") # training error of the ridge
 mse(ridge_predicted, test, "Class") # test error of the ridge
+mse(cv.ridge_fitted, train, "Class") # cv test error of the ridge
 mse(cv.ridge_predicted, test, "Class") # cv test error of the ridge
+# Calculate accuracy
+CDP_accuracy(cv.ridge_predicted, test)
 ```
 
 ### 5. LASSO
@@ -557,40 +586,80 @@ plot(fit.lasso,xvar="lambda",label=TRUE)
 cv.lasso=cv.glmnet(X,y)
 # Extract the coefficients from cross-validation
 plot(cv.lasso)
-coef(cv.lasso)
+coef(cv.lasso) # variables kept are all but Extent
 # Calculate mean squared error for the training data
-#mse(fit.lasso, raisins, "Class")
-##Predict using the lasso regression model
-#predict(fit.lasso,newx = X)
-#
+cv.lasso_fitted = predict(cv.lasso, newx = X)
+cv.lasso_predicted = predict(cv.lasso, newx = model.matrix(Class~.-1, data = test))
+mse(cv.lasso_fitted, train, "Class") # train error of the lasso
+mse(cv.lasso_predicted, test, "Class") # test error of the lasso
+
+# Calculate accuracy
+CDP_accuracy(cv.lasso_predicted, test)
 ```
 
 ### 6. TREE
 
 ```{r}
 library(tree)
+library(rpart.plot)
+
 # Fit the decision tree model
-tree = tree(Class ~ ., data = raisins)
-# Plot the decision tree
-plot(tree)
-text(tree)
+treeFit <- tree(Class ~ ., data = train)
+summary(treeFit)
 
-tree_test_predictions = predict(tree, newdata = test, type = "tree")
+# Convert the tree object to an rpart object
+treeFit_rpart <- rpart(treeFit)
 
-# Make predictions on the training data
-tree_predictions = predict(tree, newdata = train[,-8], type = "tree")
+# Plot the decision tree using rpart.plot
+rpart.plot(treeFit_rpart, box.col = c("#DD8D29", "#46ACC8"), shadow.col = "gray")
 
-# Calculate mean squared error for the test data
-#mse(tree_test_predictions, test, "Class")
+```
 
-#plot carino
-#valutarlo : prendere predizioni e calcolare mse su training e test
-#confusion matrix
+```{r}
+raisins_shb = read.csv(
+  "https://raw.githubusercontent.com/LeonardoAcquaroli/raisins_and_mushrooms/main/datasets/Raisin_Dataset.csv",
+  sep = ";", stringsAsFactors = TRUE, header = TRUE)
+
+# remove the Class column  
+raisins_shb <- raisins_shb[,-9] 
+colnames(raisins_shb)
+
+set.seed(42)
+training_index_shb = createDataPartition(raisins_shb$Class_literal, p=0.7, list = FALSE) # index of the train set examples
+train_shb = raisins_shb[training_index_shb,]
+test_shb = raisins_shb[-training_index_shb,]
+
+treeFit_rpart_shb <- rpart(formula = Class_literal  ~ . , data = train_shb)
+
+# Plot the decision tree using rpart.plot
+rpart.plot(treeFit_rpart_shb, box.col = c("#DD8D29", "#46ACC8"), shadow.col = "gray")
+
+```
+
+```{r}
+#training prediction
+tree_fitted <- predict(treeFit, newdata = train)
+
+#test predictions
+tree_predicted <- predict(treeFit, newdata = test)
+
+mse(tree_fitted, train, "Class") # training error of the train
+mse(tree_predicted, test, "Class") # test error of the test
+
+# Calculate accuracy
+CDP_accuracy(tree_predicted, test)
+
+# This approach leads to correct predictions for around 85.55% of the raisins in the test data set.
+# The best results achieved in the paper were 86.44% with a SVM
 ```
 
 ### 7. KNN
 
+<<<<<<< HEAD
+```{r}
+=======
 ```
+>>>>>>> 22aede16a8fe9c2a08137773b55507aac83aac28
 # Scaling
 train.array <- scale(train[, 1:7])
 test.array<- scale(test[, 1:7])
@@ -621,6 +690,9 @@ print(paste("Best K value:", best_k))
 
 #Data frame with K values and accuracy
 k_values_results <- data.frame(K = k_values, Accuracy = accuracy_scores)
+Knn_accuracy =  k_values_results[which.max(k_values_results$Accuracy),]
+Knn_accuracy
+
 # Plot
 ggplot(k_values_results, aes(x = K, y = 1 - Accuracy)) +
   geom_line() +
@@ -629,6 +701,31 @@ ggplot(k_values_results, aes(x = K, y = 1 - Accuracy)) +
   ggtitle("Test Error vs K") +
   theme_minimal()
 ```
+
+# Predictive power table
+
+```{r}
+mse_list = c(mse(ols_test_predictions,test, "Class"),
+             mse(ols_robust_test_predictions,test, "Class"),
+             mse(logistic_test_predictions, test, "Class"),
+             mse(cv.ridge_predicted, test, "Class"),
+             mse(cv.lasso_predicted, test, "Class"),
+             mse(tree_predicted, test, "Class"),
+             NA)
+accuracy_list = c(CDP_accuracy(ols_test_predictions, test),
+                  CDP_accuracy(ols_robust_test_predictions, test),
+                  CDP_accuracy(logistic_test_predictions, test),
+                  CDP_accuracy(cv.ridge_predicted, test),
+                  CDP_accuracy(cv.lasso_predicted, test),
+                  CDP_accuracy(tree_predicted, test),
+                  Knn_accuracy$Accuracy)
+
+sumupDF = data.frame(Test_mse = mse_list, Accuracy = accuracy_list,
+                     row.names = c("OLS", "Robust OLS", "Logistic", "Ridge", "Lasso", "Tree", "K-NN"))
+sumupDF
+```
+
+Our logistic model actually beats the SVM approach that achieved the best performance in the paper.
 
 # Unsupervised models
 
@@ -658,15 +755,10 @@ summary(pr.out)
 ```
 
 ```{r}
-
-```
-
-```{r}
 fviz_eig(pr.out, addlabels = TRUE, ylim = c(0, 70), main = "Scree Plot of PCA")
 fviz_pca_var(pr.out, col.var = "blue", col.quanti.sup = "red", 
              addlabels = TRUE, repel = TRUE)
 ```
-
 
 ```{r}
 plot(pr.out$x[, 1], pr.out$x[, 2], type = "n", xlab = "PC1", ylab = "PC2") 
@@ -689,7 +781,7 @@ km.out = kmeans(df, 2)
 km.out
 ```
 
-```{r, echo=FALSE}
+```{r}
 #Since clusters do not correspond to a specific category, we cannot estimate accuracy. 
 #However, distribution should be 450-450, but it is 189-711, so the algorithm is clearly not adequate for this dataset.
 plot (df, col = adjustcolor(km.out$cluster + 1, alpha.f = 0.1),
@@ -705,7 +797,7 @@ km.out2 = kmeans(pcadf, 2)
 km.out2
 ```
 
-```{r, echo=FALSE}
+```{r}
 #Graphical representation of the clusters. 
 #Results are slightly better on PC than on initial features
 plot (pcadf, col = adjustcolor(km.out2$cluster + 1, alpha.f = 0.5),
