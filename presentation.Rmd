@@ -20,7 +20,8 @@ We built different models to predict the species on the basis of the dimensions 
 
 The predictors that can be used are:
 
--   Area MajorAxisLength
+-   Area 
+-   MajorAxisLength
 -   MinorAxisLength
 -   Eccentricity
 -   ConvexArea
@@ -87,7 +88,7 @@ corrplot(cor_table, type = "upper",     #first corr plot
 
 ggcorr(raisins, method = c("everything", "pearson")) #heatmap plot
 
-ggpairs(raisins_corr, columns = 1:6, ggplot2::aes(colour= Class_literal)) #cor by groups
+ggpairs(raisins_corr, columns = 1:7, ggplot2::aes(colour= Class_literal, alpha = 0.005)) #cor by groups
 ```
 
 ### Boxplot
@@ -112,6 +113,8 @@ boxplot(raisins$Class, xlab = "Class")
 ```{r}
 library(ggthemes)
 ```
+
+Black: Kecimen, Yellow: Besni
 
 ```{r, echo=FALSE}
 theme_set(theme_economist())
@@ -391,22 +394,8 @@ fviz_pca_var(pr.out, col.var = "blue", col.quanti.sup = "red",
              addlabels = TRUE, repel = TRUE)
 ```
 
-```{r}
-#Correct dimensions, show clearly the points but it is not readable
-
-#plot(pr.out$x[, 1], pr.out$x[, 2], type = "n", xlab = "PC1", ylab = "PC2")  
-#points(pr.out$x[, 1], pr.out$x[, 2], col = rgb(1, 0, 0, alpha = 0.5), pch = 16) 
-#arrows(0, 0, pr.out$rotation[, 1], pr.out$rotation[, 2], length = 0.1, angle = 30)
-```
 
 ```{r}
-#Shows both the dimension and the arrows' label, but not the points
-biplot(pr.out)
-```
-
-```{r}
-#Compromise, arrows length increased
-
 plot(pr.out$x[, 1], pr.out$x[, 2], type = "n", xlab = "PC1", ylab = "PC2") 
 points(pr.out$x[, 1], pr.out$x[, 2], col = rgb(1, 0, 0, alpha = 0.5), pch = 16)  
 arrows(0, 0, pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, length = 0.1, angle = 30)

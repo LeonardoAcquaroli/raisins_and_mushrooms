@@ -18,7 +18,8 @@ We built different models to predict the species on the basis of the dimensions 
 
 The predictors that can be used are:
 
--   Area MajorAxisLength
+-   Area 
+-   MajorAxisLength
 -   MinorAxisLength
 -   Eccentricity
 -   ConvexArea
@@ -114,6 +115,8 @@ raisins <- raisins[,-8]
 ```r
 library(ggthemes)
 ```
+
+Black: Kecimen, Yellow: Besni
 
 ![](presentation_files/figure-html/unnamed-chunk-6-1.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-2.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-3.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-4.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-5.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-6.png)<!-- -->
 
@@ -383,60 +386,6 @@ mse(logistic_test_predictions, test, "Class")
 ## [1] "Best K value: 5"
 ```
 
-```
-##     K  Accuracy
-## 1   1 0.7703704
-## 2   2 0.7629630
-## 3   3 0.8000000
-## 4   4 0.8074074
-## 5   5 0.8407407
-## 6   6 0.8148148
-## 7   7 0.8333333
-## 8   8 0.8296296
-## 9   9 0.8074074
-## 10 10 0.8074074
-## 11 11 0.8037037
-## 12 12 0.8074074
-## 13 13 0.8037037
-## 14 14 0.8000000
-## 15 15 0.8148148
-## 16 16 0.8222222
-## 17 17 0.8148148
-## 18 18 0.8185185
-## 19 19 0.8185185
-## 20 20 0.8185185
-## 21 21 0.8148148
-## 22 22 0.8111111
-## 23 23 0.8148148
-## 24 24 0.8037037
-## 25 25 0.8037037
-## 26 26 0.7962963
-## 27 27 0.8000000
-## 28 28 0.8000000
-## 29 29 0.8037037
-## 30 30 0.8000000
-## 31 31 0.8037037
-## 32 32 0.8000000
-## 33 33 0.8000000
-## 34 34 0.7962963
-## 35 35 0.7925926
-## 36 36 0.8000000
-## 37 37 0.7925926
-## 38 38 0.7925926
-## 39 39 0.7962963
-## 40 40 0.7962963
-## 41 41 0.8000000
-## 42 42 0.8037037
-## 43 43 0.8074074
-## 44 44 0.7962963
-## 45 45 0.8000000
-## 46 46 0.7925926
-## 47 47 0.7962963
-## 48 48 0.7925926
-## 49 49 0.7888889
-## 50 50 0.7851852
-```
-
 ![](presentation_files/figure-html/unnamed-chunk-16-1.png)<!-- -->
 
 # Unsupervised models
@@ -550,33 +499,15 @@ fviz_pca_var(pr.out, col.var = "blue", col.quanti.sup = "red",
 ![](presentation_files/figure-html/unnamed-chunk-23-2.png)<!-- -->
 
 
-```r
-#Correct dimensions, show clearly the points but it is not readable
-
-#plot(pr.out$x[, 1], pr.out$x[, 2], type = "n", xlab = "PC1", ylab = "PC2")  
-#points(pr.out$x[, 1], pr.out$x[, 2], col = rgb(1, 0, 0, alpha = 0.5), pch = 16) 
-#arrows(0, 0, pr.out$rotation[, 1], pr.out$rotation[, 2], length = 0.1, angle = 30)
-```
-
 
 ```r
-#Shows both the dimension and the arrows' label, but not the points
-biplot(pr.out)
-```
-
-![](presentation_files/figure-html/unnamed-chunk-25-1.png)<!-- -->
-
-
-```r
-#Compromise, arrows length increased
-
 plot(pr.out$x[, 1], pr.out$x[, 2], type = "n", xlab = "PC1", ylab = "PC2") 
 points(pr.out$x[, 1], pr.out$x[, 2], col = rgb(1, 0, 0, alpha = 0.5), pch = 16)  
 arrows(0, 0, pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, length = 0.1, angle = 30)
 text(pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, labels = rownames(pr.out[[2]]), pos = 3)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-24-1.png)<!-- -->
 
 
 ```r
@@ -659,7 +590,7 @@ km.out
 ## [6] "betweenss"    "size"         "iter"         "ifault"
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-29-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
 
 ### 3. Clustering su PCA
 
@@ -718,4 +649,4 @@ km.out2
 ## [6] "betweenss"    "size"         "iter"         "ifault"
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-31-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-29-1.png)<!-- -->
