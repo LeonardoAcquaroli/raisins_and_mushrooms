@@ -55,7 +55,6 @@ sqrt(vif(ols)) > 2 # uupsieee x2
 # Deal with correlation by using best subset selection
 regfit.full=regsubsets(Class ~.,data=raisins, nvmax=7)
 reg.summary=summary(regfit.full)
-names(reg.summary) 
 plot(reg.summary$cp,xlab="Number of Variables",ylab="Cp")
 which.min(reg.summary$cp)
 plot(regfit.full,scale="Cp")
@@ -68,7 +67,7 @@ summary(ols_imp)
 vif(ols_imp) # the VIF is still too high!
 sqrt(vif(ols_imp)) > 2
 
-regfit.full=regsubsets(Class ~.,data=raisins, nvmax=4)
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=3)
 reg.summary=summary(regfit.full)
 plot(regfit.full,scale="Cp")
 
@@ -79,12 +78,13 @@ sqrt(vif(ols_imp2)) > 2
 
 check_model(ols_imp2)
 plot(ols_imp2)
+check_heteroscedasticity(ols_imp2) # there is heteroskedasticity
 
 # ols_imp2 is our final model as far as linear regressions goes. 
 # let's apply further diagnostics
 
 raw_res <- residuals(ols_imp2)
-threshold <- 2 * sd(raw_res)  # Define threshold as 2 times the SD
+threshold <- 3 * sd(raw_res)  # Define threshold as 2 times the SD
 threshold# how are the residuals distributed?
 hist(raw_res, breaks = 30, main = "Histogram of Raw Residuals", xlab = "Raw Residuals")
 
@@ -100,11 +100,76 @@ abline(v = cooks_threshold, lty = 3, col = "green")
 text(cooks_dist, raw_res, labels = 1:length(cooks_dist), pos = 3)
 # wow there are a lot of outliers
 
+# most problematic observations appear to be: 695, 507, 837, 291, 86, 488
+outliers_obs <- c(695, 507, 837, 291, 86, 488)
+outliers_df <- raisins[outliers_obs, ]
+non_outliers_df <- raisins[-outliers_obs, ]
+p <- ggplot(non_outliers_df, aes(x = Perimeter, y = Eccentricity)) +
+  geom_point() +
+  labs(title = "Scatter Plot emphasising outliers",
+       x = "Perimeter",
+       y = "Eccentricity")
+
+# Add outliers with distinct color and labels
+p <- p +
+  geom_point(data = outliers_df, color = "red", size = 3) +
+  geom_text(data = outliers_df, aes(label = paste(rownames(outliers_df))), vjust = -1)
+
+# Add reference lines for median values
+p <- p +
+  geom_vline(aes(xintercept = median(Perimeter)), linetype = "dashed") +
+  geom_hline(aes(yintercept = median(Eccentricity)), linetype = "dashed")
+
+# Plot the regression line with and without outliers
+p <- p +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(data = non_outliers_df, method = "lm", se = FALSE, linetype = "dashed", color = "blue")
+
+# Display the plot
+print(p)
+
+#computation of the accuracy on the full dataset
+fitvols_fulld = predict(ols_imp2, raisins) # fulld identifies the full dataset
+predols_fulld = ifelse(fitvols_fulld < 0.50, 0, 1)
+accols_fulld = raisins$Class == predols_fulld
+table(accols_fulld)
+accuracy_ols_fulld <- 776/900
+accuracy_ols_fulld
+
 #ROBUST OLS
 ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
 summary(ols_robust)
 check_model(ols_robust)
 
+fitvolsrob_fulld = predict(ols_robust, raisins) # fulld identifies the full dataset
+predolsrob_fulld = ifelse(fitvolsrob_fulld < 0.50, 0, 1)
+accolsrob_fulld = raisins$Class == predolsrob_fulld
+table(accolsrob_fulld)
+accuracy_olsrob_fulld <- 776/900
+accuracy_olsrob_fulld
+
+# what if we remove the "outliers" previously mentioned? 695, 507, 837, 291, 86, 488
+raisins_noout <- raisins[!(row.names(raisins) %in% c(695, 507, 837, 291, 86, 488)), ]
+
+#let's implement the models on this modified data set
+ols_imp2_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no outliers
+summary(ols_imp2_n)
+fitvols_fulld_n = predict(ols_imp2_n, raisins_noout) # fulld identifies the full dataset
+predols_fulld_n = ifelse(fitvols_fulld_n < 0.50, 0, 1)
+accols_fulld_n = raisins_noout$Class == predols_fulld_n
+table(accols_fulld_n)
+accuracy_ols_fulld_n <- 772/894
+accuracy_ols_fulld_n
+
+# same for the robust regression
+ols_rob_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no-outliers
+summary(ols_rob_n)
+fitvolsrob_fulld_n = predict(ols_rob_n, raisins_noout) # fulld identifies the full dataset
+predolsrob_fulld_n = ifelse(fitvolsrob_fulld_n < 0.50, 0, 1)
+accolsrob_fulld_n = raisins_noout$Class == predolsrob_fulld_n
+table(accolsrob_fulld_n)
+accuracy_olsrob_fulld_n <- 772/894
+accuracy_olsrob_fulld_n
 
 
 # LOGISTIC REGRESSION
@@ -139,7 +204,9 @@ accuracies <- data.frame(Model = character(),
 models <- list(logistic = logistic_model, 
                imp_logistic = imp_logistic_model,
                minimal_logit_extent = minimal1_logistic_model,
-               minimal_logit_perimeter = minimal2_logistic_model)
+               minimal_logit_perimeter = minimal2_logistic_model,
+               lpm = ols_imp2,
+               lpm_rob = ols_robust)
 
 for (model_name in names(models)) {
   model <- models[[model_name]]
@@ -178,7 +245,7 @@ plot(raisins$Perimeter, residuals_logit, xlab = "Perimeter", ylab = "Standardize
 # Diagnostics with DHARMa
 
 # Create a simulated residuals object
-simulated_residuals <- simulateResiduals(model, n = 100)
+simulated_residuals <- simulateResiduals(minimal2_logistic_model, n = 100)
 # Plot standardized residuals using DHARMa's built-in diagnostic plots
 plot(simulated_residuals)
 
@@ -186,6 +253,7 @@ plot(simulated_residuals)
 compare_performance(ols_imp2, ols_robust, minimal2_logistic_model)
 plot(compare_performance(ols_imp2, minimal2_logistic_model, rank = TRUE, verbose = FALSE))
 
+accuracies
 
 # 4. RIDGE # I didn't check this parts though
 x = model.matrix(Class~.-1, data = raisins)

@@ -11,23 +11,21 @@ output:
 
 # Description
 
-Raisins can be of two species: *Kecimen* *(Class = 1)* and *Besni (Class = 0)*.\
-We built different models to predict the species on the basis of the dimensions of the raisin example approximated as an ellipse.\
-Data are taken from the paper: <https://dergipark.org.tr/tr/download/article-file/1227592> and are available at: <https://www.kaggle.com/datasets/muratkokludataset/raisin-dataset>
+Raisins can be of two species: *Kecimen* and *Besni*.\
+We built different models to predict the species on the basis of the dimensions of the raisin example approximated as an ellipse.
 
 ## Variables
 
 The predictors that can be used are:
 
--   Area
+-   Area 
 -   MajorAxisLength
 -   MinorAxisLength
 -   Eccentricity
 -   ConvexArea
 -   Extent
 -   Perimeter
-
-The target variable is [Class.]{.underline}
+-   Class_literal
 
 # Descriptive Analysis
 
@@ -57,6 +55,13 @@ library(e1071)
 library(caTools)
 library(class)
 library(pROC)
+library(tree)
+library(leaps)   # best subset
+library(bestglm) # best subset for logistic
+library(MASS)    # diagnostics
+library(olsrr)   # diagnostics
+library(influence.ME)
+library(DHARMa)
 ```
 
 #### Loading data-set
@@ -101,80 +106,13 @@ raisins <- raisins[,-8]
 
 (Aim: visually represent relationships between variables)
 
-
-```r
-cor_table<-cor(raisins) 
-
-corrplot(cor_table, type = "upper",     #first corr plot
-         tl.col = "black", tl.srt = 45)
-```
-
-![](presentation_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
-
-```r
-ggcorr(raisins, method = c("everything", "pearson")) #heatmap plot
-```
-
-![](presentation_files/figure-html/unnamed-chunk-3-2.png)<!-- -->
-
-```r
-ggpairs(raisins_corr, columns = 1:7, ggplot2::aes(colour= Class_literal, alpha = 0.005)) #cor by groups
-```
-
-![](presentation_files/figure-html/unnamed-chunk-3-3.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-3-1.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-3-2.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-3-3.png)<!-- -->
 
 ### Boxplot
 
 (Aim: Identify outliers)
 
-
-```r
-boxplot(raisins$Area, xlab = "Area")
-```
-
-![](presentation_files/figure-html/unnamed-chunk-4-1.png)<!-- -->
-
-```r
-boxplot(raisins$MajorAxisLength, xlab = "MajorAxisLength")
-```
-
-![](presentation_files/figure-html/unnamed-chunk-4-2.png)<!-- -->
-
-```r
-boxplot(raisins$MinorAxisLength, xlab = "MinorAxisLength")
-```
-
-![](presentation_files/figure-html/unnamed-chunk-4-3.png)<!-- -->
-
-```r
-boxplot(raisins$Eccentricity, xlab = "Eccentricity")
-```
-
-![](presentation_files/figure-html/unnamed-chunk-4-4.png)<!-- -->
-
-```r
-boxplot(raisins$ConvexArea, xlab = "ConvexArea")
-```
-
-![](presentation_files/figure-html/unnamed-chunk-4-5.png)<!-- -->
-
-```r
-boxplot(raisins$Extent, xlab = "Extent")
-```
-
-![](presentation_files/figure-html/unnamed-chunk-4-6.png)<!-- -->
-
-```r
-boxplot(raisins$Perimeter, xlab = "Perimeter")
-```
-
-![](presentation_files/figure-html/unnamed-chunk-4-7.png)<!-- -->
-
-```r
-boxplot(raisins$Class, xlab = "Class")
-```
-
-![](presentation_files/figure-html/unnamed-chunk-4-8.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-4-1.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-2.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-3.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-4.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-5.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-6.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-7.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-4-8.png)<!-- -->
 
 ### Histograms highlighting class differences
 
@@ -187,78 +125,681 @@ library(ggthemes)
 
 Black: Kecimen, Yellow: Besni
 
-
-```r
-theme_set(theme_economist())
-
-ggplot() +
-geom_histogram(data = subset(x=raisins, subset=Class==1), 
-               aes(x = Area), fill = 'black', alpha = 0.5) +
-geom_histogram(data = subset(x=raisins, subset=Class==0), 
-                 aes(x = Area), fill='yellow', alpha = 0.5) +
-ggtitle(paste0("Comparison between Area's distribution" )) 
-```
-
-![](presentation_files/figure-html/unnamed-chunk-6-1.png)<!-- -->
-
-```r
-ggplot() + 
-geom_histogram(data = subset(x=raisins, subset=Class==1), 
-               aes(x = MinorAxisLength), fill = 'black', alpha = 0.5) + 
-geom_histogram(data = subset(x=raisins, subset=Class==0), 
-               aes(x = MinorAxisLength), fill='yellow', alpha = 0.5) +
-ggtitle(paste0("Comparison between MinorAxisLength's distribution" )) 
-```
-
-![](presentation_files/figure-html/unnamed-chunk-6-2.png)<!-- -->
-
-```r
-ggplot() + 
-geom_histogram(data = subset(x=raisins, subset=Class==1), 
-               aes(x = Eccentricity), fill = 'black', alpha = 0.5) + 
-geom_histogram(data = subset(x=raisins, subset=Class==0), 
-               aes(x = Eccentricity), fill='yellow', alpha = 0.5) +
-ggtitle(paste0("Comparison between Eccentricity's distribution" )) 
-```
-
-![](presentation_files/figure-html/unnamed-chunk-6-3.png)<!-- -->
-
-```r
-ggplot() + 
-geom_histogram(data = subset(x=raisins, subset=Class==1), 
-               aes(x = ConvexArea), fill = 'black', alpha = 0.5) + 
-geom_histogram(data = subset(x=raisins, subset=Class==0), 
-               aes(x = ConvexArea), fill='yellow', alpha = 0.5) +
-ggtitle(paste0("Comparison between ConvexArea's distribution" )) 
-```
-
-![](presentation_files/figure-html/unnamed-chunk-6-4.png)<!-- -->
-
-```r
-ggplot() + 
-geom_histogram(data = subset(x=raisins, subset=Class==1), 
-               aes(x = Extent), fill = 'black', alpha = 0.5) + 
-geom_histogram(data = subset(x=raisins, subset=Class==0), 
-               aes(x = Extent), fill='yellow', alpha = 0.5) +
-ggtitle(paste0("Comparison between Extent's distribution" ))
-```
-
-![](presentation_files/figure-html/unnamed-chunk-6-5.png)<!-- -->
-
-```r
-ggplot() + 
-geom_histogram(data = subset(x=raisins, subset=Class==1), 
-               aes(x = Perimeter), fill = 'black', alpha = 0.5) + 
-geom_histogram(data = subset(x=raisins, subset=Class==0), 
-               aes(x = Perimeter), fill='yellow', alpha = 0.5) +
-ggtitle(paste0("Comparison between Perimeter's distribution" ))
-```
-
-![](presentation_files/figure-html/unnamed-chunk-6-6.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-6-1.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-2.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-3.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-4.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-5.png)<!-- -->![](presentation_files/figure-html/unnamed-chunk-6-6.png)<!-- -->
 
 # Supervised models
 
-#### Splitting train and test test
+## We first use all the dataset
+
+#### We run a basic ols model, which would be a linear probability model
+
+```r
+ols <- lm("Class ~ .",data=raisins)
+summary(ols)
+```
+
+```
+## 
+## Call:
+## lm(formula = "Class ~ .", data = raisins)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.12899 -0.25192  0.01594  0.25715  1.23867 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)      3.568e+00  3.923e-01   9.096  < 2e-16 ***
+## Area            -3.869e-05  6.034e-06  -6.412 2.33e-10 ***
+## MajorAxisLength  2.189e-03  1.146e-03   1.910  0.05643 .  
+## MinorAxisLength  2.154e-04  1.483e-03   0.145  0.88456    
+## Eccentricity    -9.166e-01  2.957e-01  -3.100  0.00199 ** 
+## ConvexArea       4.894e-05  6.059e-06   8.077 2.15e-15 ***
+## Extent           8.348e-02  2.772e-01   0.301  0.76337    
+## Perimeter       -3.837e-03  5.800e-04  -6.616 6.36e-11 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.3508 on 892 degrees of freedom
+## Multiple R-squared:  0.5123,	Adjusted R-squared:  0.5084 
+## F-statistic: 133.8 on 7 and 892 DF,  p-value: < 2.2e-16
+```
+
+#### We check for heteroskedasticity and multicollinearity
+
+```r
+check_heteroscedasticity(ols) # there is heteroskedasticity
+```
+
+```
+## Warning: Heteroscedasticity (non-constant error variance) detected (p = 0.040).
+```
+
+```r
+check_model(ols)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-8-1.png)<!-- -->
+
+```r
+vif(ols)
+```
+
+```
+##            Area MajorAxisLength MinorAxisLength    Eccentricity      ConvexArea 
+##      404.718824      129.152882       40.166637        5.210356      445.947568 
+##          Extent       Perimeter 
+##        1.605335      184.252844
+```
+
+```r
+sqrt(vif(ols)) > 2
+```
+
+```
+##            Area MajorAxisLength MinorAxisLength    Eccentricity      ConvexArea 
+##            TRUE            TRUE            TRUE            TRUE            TRUE 
+##          Extent       Perimeter 
+##           FALSE            TRUE
+```
+#### There appears to be heteroskedacity, plus the multicollinearity is extremely high
+
+#### We try to tackle multicollinearity by reducing the variables in the model. We use best subset selection.
+
+```r
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=7)
+reg.summary=summary(regfit.full)
+plot(reg.summary$cp,xlab="Number of Variables",ylab="Cp")
+```
+
+<img src="presentation_files/figure-html/unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
+
+```r
+which.min(reg.summary$cp)
+```
+
+```
+## [1] 5
+```
+
+```r
+plot(regfit.full,scale="Cp")
+```
+
+<img src="presentation_files/figure-html/unnamed-chunk-9-2.png" style="display: block; margin: auto;" />
+
+#### As we can see, the best model appears to be one with 5 variables. We run this improved ols model
+
+```r
+ols_imp <- lm("Class ~ Area + MajorAxisLength + 
+              Eccentricity + ConvexArea + Perimeter",data=raisins)
+summary(ols_imp)
+```
+
+```
+## 
+## Call:
+## lm(formula = "Class ~ Area + MajorAxisLength + \n              Eccentricity + ConvexArea + Perimeter", 
+##     data = raisins)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.13065 -0.24783  0.01591  0.25803  1.24484 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)      3.683e+00  2.135e-01  17.252  < 2e-16 ***
+## Area            -3.776e-05  4.333e-06  -8.715  < 2e-16 ***
+## MajorAxisLength  2.067e-03  8.150e-04   2.536 0.011374 *  
+## Eccentricity    -9.437e-01  2.628e-01  -3.591 0.000347 ***
+## ConvexArea       4.842e-05  5.457e-06   8.875  < 2e-16 ***
+## Perimeter       -3.805e-03  4.144e-04  -9.183  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.3504 on 894 degrees of freedom
+## Multiple R-squared:  0.5122,	Adjusted R-squared:  0.5095 
+## F-statistic: 187.7 on 5 and 894 DF,  p-value: < 2.2e-16
+```
+
+```r
+vif(ols_imp) # the VIF is still too high!
+```
+
+```
+##            Area MajorAxisLength    Eccentricity      ConvexArea       Perimeter 
+##      209.089582       65.482372        4.124587      362.380343       94.243582
+```
+#### the VIF is extremely high. 
+### Given that most of our variables are highly correlated, we identify three "proper" dimensions over which our data span.
+#### Thus, we perform best subset selection specifying that we want at most 3 variables
+
+```r
+regfit.full=regsubsets(Class ~.,data=raisins, nvmax=3)
+reg.summary=summary(regfit.full)
+plot(regfit.full,scale="Cp")
+```
+
+<img src="presentation_files/figure-html/unnamed-chunk-11-1.png" style="display: block; margin: auto;" />
+
+#### We observe that two variables are very similar. Thus, we opt for the minimal model with two variables.
+
+
+```r
+ols_imp2 <- lm("Class ~ Eccentricity + Perimeter",data=raisins)
+summary(ols_imp2)
+```
+
+```
+## 
+## Call:
+## lm(formula = "Class ~ Eccentricity + Perimeter", data = raisins)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.03758 -0.30279  0.04866  0.28119  1.80574 
+## 
+## Coefficients:
+##                Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   2.511e+00  1.062e-01  23.634  < 2e-16 ***
+## Eccentricity -9.717e-01  1.509e-01  -6.441 1.93e-10 ***
+## Perimeter    -1.073e-03  4.977e-05 -21.569  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.3653 on 897 degrees of freedom
+## Multiple R-squared:  0.4681,	Adjusted R-squared:  0.4669 
+## F-statistic: 394.8 on 2 and 897 DF,  p-value: < 2.2e-16
+```
+
+```r
+vif(ols_imp2)
+```
+
+```
+## Eccentricity    Perimeter 
+##     1.250884     1.250884
+```
+
+```r
+check_model(ols_imp2)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
+
+#### ols_imp2 is our final model as far as linear regression goes. We now focus on its residuals.
+
+
+```r
+raw_res <- residuals(ols_imp2)
+threshold <- 3 * sd(raw_res)  # Define threshold as 3 times the SD
+threshold# how are the residuals distributed?
+```
+
+```
+## [1] 1.094547
+```
+
+```r
+hist(raw_res, breaks = 30, main = "Histogram of Raw Residuals", xlab = "Raw Residuals")
+```
+
+![](presentation_files/figure-html/unnamed-chunk-13-1.png)<!-- -->
+
+#### We also compute Cook's distance and plot it with the residuals
+
+
+```r
+cooks_dist <- cooks.distance(ols_imp2)
+cooks_threshold <- 4/897
+plot(cooks_dist, raw_res, main = "Cook's Distance vs. Raw Residuals",
+     xlab = "Cook's Distance", ylab = "Raw Residuals")
+abline(h = 0, lty = 2, col = "red")  # Reference line at y = 0
+abline(h = threshold, lty = 3, col = "blue")  # Threshold line for raw residuals (upper)
+abline(h = -threshold, lty = 3, col = "blue")  # Threshold line for raw residuals (lower)
+abline(v = cooks_threshold, lty = 3, col = "green")
+text(cooks_dist, raw_res, labels = 1:length(cooks_dist), pos = 3)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-14-1.png)<!-- -->
+
+#### The most problematic observations appear to be: 695, 507, 837, 291, 86, 488. We should dig deeper into them.
+
+```r
+outliers_obs <- c(695, 507, 837, 291, 86, 488)
+outliers_df <- raisins[outliers_obs, ]
+non_outliers_df <- raisins[-outliers_obs, ]
+
+# Plot without outliers
+p <- ggplot(non_outliers_df, aes(x = Perimeter, y = Eccentricity)) +
+  geom_point() +
+  labs(title = "Scatter Plot emphasising outliers",
+       x = "Perimeter",
+       y = "Eccentricity")
+
+# Add outliers with distinct color
+p <- p +
+  geom_point(data = outliers_df, color = "red", size = 3) +
+  geom_text(data = outliers_df, aes(label = paste(rownames(outliers_df))), vjust = -1)
+
+# Median values
+p <- p +
+  geom_vline(aes(xintercept = median(Perimeter)), linetype = "dashed") +
+  geom_hline(aes(yintercept = median(Eccentricity)), linetype = "dashed")
+
+# Regression line
+p <- p +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(data = non_outliers_df, method = "lm", se = FALSE, linetype = "dashed", color = "blue")
+
+# Display the plot
+print(p)
+```
+
+<img src="presentation_files/figure-html/unnamed-chunk-15-1.png" style="display: block; margin: auto;" />
+
+#### These observations clearly have a very large "Perimeter", however they do not appear to be completely wrong.<br> We can still try to remove them and see how the performance changes. <br> We now plot the accuracy of our model on the whole dataset
+
+
+
+
+```r
+#computation of the accuracy on the full dataset
+fitvols_fulld = predict(ols_imp2, raisins) # fulld identifies the full dataset
+predols_fulld = ifelse(fitvols_fulld < 0.50, 0, 1)
+accols_fulld = raisins$Class == predols_fulld
+table(accols_fulld)
+```
+
+```
+## accols_fulld
+## FALSE  TRUE 
+##   124   776
+```
+
+```r
+accuracy_ols_fulld <- 776/900
+accuracy_ols_fulld
+```
+
+```
+## [1] 0.8622222
+```
+
+#### Given that we found heteroskedasticity, we perform the same model with the robust option.
+
+
+```r
+#ROBUST OLS
+ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
+summary(ols_robust)
+```
+
+```
+## 
+## Call:
+## lm_robust(formula = Class ~ Eccentricity + Perimeter, data = raisins, 
+##     se_type = "HC2")
+## 
+## Standard error type:  HC2 
+## 
+## Coefficients:
+##               Estimate Std. Error t value   Pr(>|t|)  CI Lower   CI Upper  DF
+## (Intercept)   2.510968  1.002e-01  25.069 1.541e-105  2.314392  2.7075452 897
+## Eccentricity -0.971708  1.367e-01  -7.108  2.403e-12 -1.240012 -0.7034040 897
+## Perimeter    -0.001073  6.693e-05 -16.039  4.297e-51 -0.001205 -0.0009421 897
+## 
+## Multiple R-squared:  0.4681 ,	Adjusted R-squared:  0.4669 
+## F-statistic: 251.8 on 2 and 897 DF,  p-value: < 2.2e-16
+```
+#### We compute the accuracy as we did before
+
+```r
+fitvolsrob_fulld = predict(ols_robust, raisins) # fulld identifies the full dataset
+predolsrob_fulld = ifelse(fitvolsrob_fulld < 0.50, 0, 1)
+accolsrob_fulld = raisins$Class == predolsrob_fulld
+table(accolsrob_fulld)
+```
+
+```
+## accolsrob_fulld
+## FALSE  TRUE 
+##   124   776
+```
+
+```r
+accuracy_olsrob_fulld <- 776/900
+accuracy_olsrob_fulld
+```
+
+```
+## [1] 0.8622222
+```
+#### We now remove the "outliers" from the dataset and preform the very same models.
+
+
+```r
+raisins_noout <- raisins[!(row.names(raisins) %in% c(695, 507, 837, 291, 86, 488)), ]
+```
+
+#### First the "normal" model
+
+```r
+ols_imp2_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no outliers
+summary(ols_imp2_n)
+```
+
+```
+## 
+## Call:
+## lm(formula = "Class ~ Eccentricity + Perimeter", data = raisins_noout)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.06624 -0.28222  0.05692  0.27255  0.76195 
+## 
+## Coefficients:
+##                Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   2.6476056  0.1026150  25.801  < 2e-16 ***
+## Eccentricity -0.9332612  0.1442159  -6.471  1.6e-10 ***
+## Perimeter    -0.0012245  0.0000504 -24.296  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.3489 on 891 degrees of freedom
+## Multiple R-squared:  0.5147,	Adjusted R-squared:  0.5136 
+## F-statistic: 472.5 on 2 and 891 DF,  p-value: < 2.2e-16
+```
+
+```r
+fitvols_fulld_n = predict(ols_imp2_n, raisins_noout) # fulld identifies the full dataset
+predols_fulld_n = ifelse(fitvols_fulld_n < 0.50, 0, 1)
+accols_fulld_n = raisins_noout$Class == predols_fulld_n
+table(accols_fulld_n)
+```
+
+```
+## accols_fulld_n
+## FALSE  TRUE 
+##   122   772
+```
+
+```r
+accuracy_ols_fulld_n <- 772/894
+accuracy_ols_fulld_n
+```
+
+```
+## [1] 0.8635347
+```
+#### Then the robust one
+
+
+```r
+ols_rob_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no-outliers
+summary(ols_rob_n)
+```
+
+```
+## 
+## Call:
+## lm(formula = "Class ~ Eccentricity + Perimeter", data = raisins_noout)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.06624 -0.28222  0.05692  0.27255  0.76195 
+## 
+## Coefficients:
+##                Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   2.6476056  0.1026150  25.801  < 2e-16 ***
+## Eccentricity -0.9332612  0.1442159  -6.471  1.6e-10 ***
+## Perimeter    -0.0012245  0.0000504 -24.296  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.3489 on 891 degrees of freedom
+## Multiple R-squared:  0.5147,	Adjusted R-squared:  0.5136 
+## F-statistic: 472.5 on 2 and 891 DF,  p-value: < 2.2e-16
+```
+
+```r
+fitvolsrob_fulld_n = predict(ols_rob_n, raisins_noout) # fulld identifies the full dataset
+predolsrob_fulld_n = ifelse(fitvolsrob_fulld_n < 0.50, 0, 1)
+accolsrob_fulld_n = raisins_noout$Class == predolsrob_fulld_n
+table(accolsrob_fulld_n)
+```
+
+```
+## accolsrob_fulld_n
+## FALSE  TRUE 
+##   122   772
+```
+
+```r
+accuracy_olsrob_fulld_n <- 772/894
+accuracy_olsrob_fulld_n
+```
+
+```
+## [1] 0.8635347
+```
+
+
+### We now move to logistic regression
+
+
+```r
+logistic_model <-  glm(Class ~ ., data = raisins, family = binomial(link = 'logit'))
+tidy(logistic_model)
+```
+
+```
+## # A tibble: 8 × 5
+##   term             estimate std.error statistic      p.value
+##   <chr>               <dbl>     <dbl>     <dbl>        <dbl>
+## 1 (Intercept)      2.23      7.04         0.317 0.751       
+## 2 Area            -0.000501  0.000124    -4.03  0.0000566   
+## 3 MajorAxisLength  0.0446    0.0160       2.79  0.00524     
+## 4 MinorAxisLength  0.0911    0.0269       3.38  0.000722    
+## 5 Eccentricity     3.89      4.91         0.792 0.428       
+## 6 ConvexArea       0.000409  0.000119     3.43  0.000594    
+## 7 Extent           0.683     2.72         0.251 0.802       
+## 8 Perimeter       -0.0361    0.00661     -5.46  0.0000000468
+```
+
+```r
+vif(logistic_model)
+```
+
+```
+##            Area MajorAxisLength MinorAxisLength    Eccentricity      ConvexArea 
+##      490.367743       70.630453       83.217726       12.954578      475.455021 
+##          Extent       Perimeter 
+##        1.328813       70.195325
+```
+
+```r
+hist(fitted(logistic_model))
+```
+
+<img src="presentation_files/figure-html/unnamed-chunk-22-1.png" style="display: block; margin: auto;" />
+
+#### We perform best subset selection on the logistic model as well
+
+```r
+bestglm(raisins, family = gaussian, IC = "BIC")
+```
+
+```
+## BIC
+## BICq equivalent for q in (5.38544187023149e-09, 0.532772479819852)
+## Best Model:
+##                  Estimate   Std. Error    t value     Pr(>|t|)
+## (Intercept)  3.228091e+00 1.445365e-01  22.334086 3.460498e-88
+## Area        -3.835214e-05 4.104717e-06  -9.343431 7.200693e-20
+## ConvexArea   5.187278e-05 5.028354e-06  10.316057 1.180887e-23
+## Perimeter   -3.508593e-03 2.454475e-04 -14.294674 6.599333e-42
+```
+
+```r
+imp_logistic_model <- glm(Class ~ Area + ConvexArea + Perimeter, 
+                    data = raisins, 
+                    family = binomial(link = 'logit'))
+vif(imp_logistic_model)
+```
+
+```
+##       Area ConvexArea  Perimeter 
+##  422.14309  554.65662   22.25865
+```
+
+####  These still appears to have multicollinearity issues.
+#### As before, we use our intuition to build a minimal logistic model
+#### We actually build two of them:
+
+
+```r
+minimal1_logistic_model <-  glm(Class ~ Extent + Eccentricity, data = raisins, family = binomial(link = 'logit'))
+vif(minimal1_logistic_model)
+```
+
+```
+##       Extent Eccentricity 
+##     1.116328     1.116328
+```
+
+```r
+minimal2_logistic_model <-  glm(Class ~ Eccentricity + Perimeter, data = raisins,family = binomial(link = 'logit'))
+vif(minimal2_logistic_model)
+```
+
+```
+## Eccentricity    Perimeter 
+##     1.012988     1.012988
+```
+
+#### We now create a table with the accuracies of all our models
+
+```r
+accuracies <- data.frame(Model = character(),
+                         Accuracy = numeric())
+
+models <- list(logistic = logistic_model, 
+               imp_logistic = imp_logistic_model,
+               minimal_logit_extent = minimal1_logistic_model,
+               minimal_logit_perimeter = minimal2_logistic_model,
+               lpm = ols_imp2,
+               lpm_rob = ols_robust)
+
+for (model_name in names(models)) {
+  model <- models[[model_name]]
+  
+  # Predict the outcome probabilities using the logistic regression model
+  pred_pr <- predict(model, raisins, type = "response")
+  # Convert the predicted probabilities to binary predictions (0 or 1)
+  pred_val <- ifelse(pred_pr > 0.5, 1, 0)
+  # Compare the predicted values with the actual outcome variable
+  actual_values <- raisins$Class
+  # Compute the number of correctly predicted values
+  correctly_pred <- sum(pred_val == actual_values)
+  # Compute the percentage of correctly predicted values
+  accuracy <- correctly_pred / length(actual_values) * 100
+  # Append the accuracy to the "accuracies" data frame
+  accuracies <- rbind(accuracies, data.frame(Model = model_name, Accuracy = accuracy))
+}
+
+accuracies
+```
+
+```
+##                     Model Accuracy
+## 1                logistic 85.77778
+## 2            imp_logistic 85.33333
+## 3    minimal_logit_extent 70.77778
+## 4 minimal_logit_perimeter 86.44444
+## 5                     lpm 86.22222
+## 6                 lpm_rob 86.22222
+```
+
+#### Since the minimal logisitc model with the perimeter is the best one, we compute diagnostics on it.
+
+```r
+predicted_probs_logit <- predict(minimal2_logistic_model, type = "response")
+residuals_logit <- raisins$Class - predicted_probs_logit
+
+plot(predicted_probs_logit, raisins$Class, xlab = "Predicted Probabilities", ylab = "Observed Responses",
+     main = "Observed vs. Predicted Probabilities", pch = 16)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
+
+```r
+#check relations with each predictor
+plot(raisins$Eccentricity, residuals_logit, xlab = "Eccentricity", ylab = "Standardized Residuals",
+     main = "Standardized Residuals vs. Predictor 1", pch = 16)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-26-2.png)<!-- -->
+
+```r
+plot(raisins$Perimeter, residuals_logit, xlab = "Perimeter", ylab = "Standardized Residuals",
+     main = "Standardized Residuals vs. Predictor 1", pch = 16)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-26-3.png)<!-- -->
+
+```r
+# Diagnostics with DHARMa
+
+# Create a simulated residuals object
+simulated_residuals <- simulateResiduals(minimal2_logistic_model, n = 100)
+# Plot standardized residuals using DHARMa's built-in diagnostic plots
+plot(simulated_residuals)
+```
+
+![](presentation_files/figure-html/unnamed-chunk-26-4.png)<!-- -->
+
+### Comparison of all the models so far
+
+
+```r
+# Compare all the models
+compare_performance(ols_imp2, ols_robust, minimal2_logistic_model)
+```
+
+```
+## # Comparison of Model Performance Indices
+## 
+## Name                    |     Model | AIC (weights) | AICc (weights) | BIC (weights) |  RMSE | Sigma |    R2 | R2 (adj.) | Tjur's R2 | Log_loss | Score_log | Score_spherical |   PCP
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ols_imp2                |        lm | 746.2 (<.001) |  746.2 (<.001) | 765.4 (<.001) | 0.365 | 0.365 | 0.468 |     0.467 |           |          |           |                 |      
+## ols_robust              | lm_robust | 746.2 (<.001) |  746.2 (<.001) | 765.4 (<.001) | 0.365 | 0.365 | 0.468 |     0.467 |           |          |           |                 |      
+## minimal2_logistic_model |       glm | 636.2 (>.999) |  636.3 (>.999) | 650.6 (>.999) | 0.320 | 0.838 |       |           |     0.574 |    0.350 |      -Inf |           0.008 | 0.787
+```
+
+```r
+plot(compare_performance(ols_imp2, minimal2_logistic_model, rank = TRUE, verbose = FALSE))
+```
+
+![](presentation_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
+
+```r
+accuracies
+```
+
+```
+##                     Model Accuracy
+## 1                logistic 85.77778
+## 2            imp_logistic 85.33333
+## 3    minimal_logit_extent 70.77778
+## 4 minimal_logit_perimeter 86.44444
+## 5                     lpm 86.22222
+## 6                 lpm_rob 86.22222
+```
+
+
+## We now performe some actual statistical learning
+#### We split our data in train and test set
 
 
 ```r
@@ -283,21 +824,6 @@ mse = function(predictions,data,y){
 }
 ```
 
-#### Accuracy function
-
-
-```r
-# Casual Deep Learning accuracy function
-CDP_accuracy <- function(test_predictions_vector, test_set){
-        model_classes = ifelse(test_predictions_vector >= 0.5, 1,0)
-        modelCM<-table(model_classes,test_set$Class)
-        modelCM
-        model_right_guesses = modelCM[1] + modelCM[4]
-        model_accuracy = model_right_guesses/length(model_classes)
-        return(model_accuracy)
-        }
-```
-
 ## MODELS
 
 ### 1. OLS
@@ -305,7 +831,7 @@ CDP_accuracy <- function(test_predictions_vector, test_set){
 
 ```r
 # Fit the linear regression model
-ols = lm("Class ~ .",data=train)
+ols = lm("Class ~ Perimeter + Eccentricity",data=train)
 # Summary of the model
 print(summary(ols))
 ```
@@ -313,28 +839,23 @@ print(summary(ols))
 ```
 ## 
 ## Call:
-## lm(formula = "Class ~ .", data = train)
+## lm(formula = "Class ~ Perimeter + Eccentricity", data = train)
 ## 
 ## Residuals:
 ##      Min       1Q   Median       3Q      Max 
-## -1.14592 -0.23372  0.01838  0.25465  0.69993 
+## -0.99737 -0.29624  0.05971  0.27956  1.33647 
 ## 
 ## Coefficients:
-##                   Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)      3.690e+00  4.534e-01   8.139 2.18e-15 ***
-## Area            -3.371e-05  6.771e-06  -4.978 8.31e-07 ***
-## MajorAxisLength  2.259e-03  1.311e-03   1.723   0.0854 .  
-## MinorAxisLength  5.358e-05  1.732e-03   0.031   0.9753    
-## Eccentricity    -8.676e-01  3.385e-01  -2.563   0.0106 *  
-## ConvexArea       4.475e-05  6.781e-06   6.599 8.89e-11 ***
-## Extent           8.826e-03  3.186e-01   0.028   0.9779    
-## Perimeter       -3.969e-03  6.719e-04  -5.907 5.73e-09 ***
+##                Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   2.491e+00  1.256e-01  19.836  < 2e-16 ***
+## Perimeter    -1.115e-03  5.709e-05 -19.525  < 2e-16 ***
+## Eccentricity -8.843e-01  1.762e-01  -5.019 6.79e-07 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## Residual standard error: 0.3445 on 622 degrees of freedom
-## Multiple R-squared:  0.5313,	Adjusted R-squared:  0.526 
-## F-statistic: 100.7 on 7 and 622 DF,  p-value: < 2.2e-16
+## Residual standard error: 0.3584 on 627 degrees of freedom
+## Multiple R-squared:  0.4887,	Adjusted R-squared:  0.4871 
+## F-statistic: 299.7 on 2 and 627 DF,  p-value: < 2.2e-16
 ```
 
 
@@ -345,7 +866,7 @@ ols_test_predictions = predict.lm(ols,newdata = test)
 hist(fitted(ols))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-31-1.png)<!-- -->
 
 ```r
 # Calculate MSE for the training data
@@ -354,26 +875,17 @@ mse_train
 ```
 
 ```
-## [1] 0.1171742
+## [1] 0.1278151
 ```
 
 ```r
 # Calculate MSE for the test data
 mse_test<-mse(ols_test_predictions,test,"Class") #test error
-mse_test
+mse_test # it was 0.1346953 before changing variables # it's 0.145 after reducing the model
 ```
 
 ```
-## [1] 0.1346953
-```
-
-```r
-# Calculate accuracy
-CDP_accuracy(ols_test_predictions, test)
-```
-
-```
-## [1] 0.8555556
+## [1] 0.1453523
 ```
 
 ### 2. ROBUST OLS
@@ -418,7 +930,7 @@ ols_robust_test_predictions = predict(ols_robust, newdata = test)
 hist(fitted(ols_robust))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
 
 ```r
 # Calculate MSE for the training data
@@ -438,15 +950,6 @@ mse(ols_robust_test_predictions, test, "Class") #test error
 ## [1] 0.1356805
 ```
 
-```r
-# Calculate accuracy
-CDP_accuracy(ols_robust_test_predictions, test)
-```
-
-```
-## [1] 0.8481481
-```
-
 ### 3. LOGISTIC
 
 
@@ -454,38 +957,33 @@ CDP_accuracy(ols_robust_test_predictions, test)
 library(broom)
 
 # 3. Logistic
-logistic = glm(Class ~ ., data = train, family = binomial(link = 'logit'))
+logistic = glm(Class ~ Perimeter + Eccentricity, data = train, family = binomial(link = 'logit'))
 tidy(logistic)
 ```
 
 ```
-## # A tibble: 8 × 5
-##   term              estimate std.error statistic p.value
-##   <chr>                <dbl>     <dbl>     <dbl>   <dbl>
-## 1 (Intercept)     -13.3       8.67       -1.54   0.124  
-## 2 Area              0.000473  0.000228    2.08   0.0377 
-## 3 MajorAxisLength   0.0184    0.0222      0.831  0.406  
-## 4 MinorAxisLength   0.113     0.0355      3.18   0.00147
-## 5 Eccentricity     12.1       5.07        2.40   0.0166 
-## 6 ConvexArea       -0.000706  0.000226   -3.12   0.00179
-## 7 Extent           -0.135     3.55       -0.0381 0.970  
-## 8 Perimeter        -0.0100    0.00926    -1.09   0.278
+## # A tibble: 3 × 5
+##   term         estimate std.error statistic  p.value
+##   <chr>           <dbl>     <dbl>     <dbl>    <dbl>
+## 1 (Intercept)   19.3      1.78        10.8  3.03e-27
+## 2 Perimeter     -0.0124   0.00109    -11.4  5.86e-30
+## 3 Eccentricity  -6.79     1.81        -3.76 1.72e- 4
 ```
 
 ```r
 hist(fitted(logistic))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-13-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
 
 ```r
 #logistic by hand
 logistic_test_predictions = predict(logistic, newdata = test)
-mse(fitted(logistic), train, "Class")
+mse(fitted(logistic), train, "Class") # 0.09080575 before <- 0.09835077 after 
 ```
 
 ```
-## [1] 0.09080575
+## [1] 0.09835077
 ```
 
 ```r
@@ -493,15 +991,7 @@ mse(logistic_test_predictions, test, "Class")
 ```
 
 ```
-## [1] 37.4428
-```
-
-```r
-CDP_accuracy(logistic_test_predictions, test)
-```
-
-```
-## [1] 0.8740741
+## [1] 12.18564
 ```
 
 ### 4. RIDGE
@@ -510,1284 +1000,13 @@ CDP_accuracy(logistic_test_predictions, test)
 ```r
 library(glmnet)
 X = model.matrix(Class~.-1, data = train)
-X
-```
-
-```
-##       Area MajorAxisLength MinorAxisLength Eccentricity ConvexArea    Extent
-## 3    90856        442.2670        266.3283    0.7983536      93717 0.6376128
-## 7    42492        310.1461        176.1314    0.8230987      43904 0.6658936
-## 8    60952        332.4555        235.4298    0.7060575      62329 0.7435982
-## 9    42256        323.1896        172.5759    0.8454988      44743 0.6980309
-## 10   64380        366.9648        227.7716    0.7840556      66125 0.6643757
-## 11   80437        449.4546        232.3255    0.8560425      84460 0.6742358
-## 12   43725        301.3222        186.9506    0.7842585      45021 0.6970682
-## 13   43441        276.6108        201.8131    0.6838823      45133 0.6908556
-## 15   74167        387.7989        247.8581    0.7690897      76807 0.6801816
-## 16   33565        261.5543        167.7085    0.7673743      35794 0.6815505
-## 17   64670        403.0840        206.4846    0.8588292      66419 0.7567726
-## 18   64762        354.2939        235.7525    0.7464737      66713 0.6949980
-## 19   43295        304.2845        182.8110    0.7994070      44714 0.7138382
-## 20   70699        418.6986        216.5961    0.8557994      72363 0.7280751
-## 21   69726        354.1769        252.5292    0.7011610      71849 0.7343985
-## 22   57346        330.4784        222.4437    0.7395550      59365 0.7236088
-## 23   82028        397.1150        268.3338    0.7371694      84427 0.6863751
-## 24   61251        301.5078        273.6599    0.4197537      64732 0.6435957
-## 26   75620        368.2243        263.4593    0.6986273      77493 0.7262774
-## 27   73167        340.0552        276.0152    0.5841058      74545 0.7787369
-## 28   60847        336.9239        231.4657    0.7266602      62492 0.6985878
-## 30   59902        358.5919        222.9020    0.7833320      63250 0.7441242
-## 31   88745        429.7704        265.6902    0.7860095      90715 0.7520635
-## 32   41809        307.5327        175.0856    0.8221137      43838 0.6974444
-## 33   75329        364.2308        265.8669    0.6835105      77541 0.7230797
-## 35   46427        253.8420        235.9068    0.3692125      48275 0.6842191
-## 37   55827        305.2988        234.6612    0.6396961      57724 0.7032880
-## 39   77468        405.9366        245.9898    0.7954792      79220 0.7215454
-## 40   49882        287.2643        222.1859    0.6338519      50880 0.7663778
-## 41   95245        397.0941        307.2739    0.6334223      97988 0.7530440
-## 42   71464        364.1031        253.7969    0.7170255      73265 0.7154843
-## 45   77310        436.5299        228.2804    0.8523675      80138 0.6317209
-## 46   57580        330.2284        232.0554    0.7114746      60232 0.6451035
-## 47   69708        375.4473        239.1328    0.7709235      71321 0.7271779
-## 49   45800        330.0087        181.6659    0.8348430      47802 0.7326828
-## 51   44939        317.6167        183.3152    0.8166321      46400 0.6561779
-## 53   65727        403.1943        210.0733    0.8535430      67372 0.6169811
-## 54   45683        333.2625        177.7721    0.8458445      48787 0.6342307
-## 56   47581        306.8119        203.0975    0.7495383      49203 0.6677754
-## 57   57127        311.6446        238.6419    0.6431380      59943 0.6936255
-## 59   69060        328.4889        275.8889    0.5427832      72223 0.7270239
-## 61   66774        348.5580        246.4763    0.7070823      69097 0.6924465
-## 62   47839        312.6013        198.7513    0.7718555      50166 0.7027706
-## 63   78571        443.8223        228.7576    0.8569340      81718 0.6421928
-## 65   60462        373.3428        208.1086    0.8302309      62213 0.6656831
-## 67   54056        332.2676        208.6190    0.7783228      55539 0.6745533
-## 68   89235        443.5159        258.9467    0.8118616      91201 0.6551906
-## 69   51727        321.1271        208.7668    0.7598433      52913 0.7518896
-## 73   69006        379.3178        241.8503    0.7703736      72895 0.6974530
-## 74   68520        373.2356        237.0415    0.7724309      70759 0.7128589
-## 75   52731        309.9773        219.7254    0.7053659      54438 0.6958800
-## 77   75825        391.2043        248.5003    0.7723323      77437 0.7453700
-## 80   47851        323.1525        191.6110    0.8052446      49187 0.7732370
-## 81   51220        328.6476        202.5089    0.7875987      52903 0.6924710
-## 82   53890        331.0863        216.5795    0.7563666      57109 0.7044444
-## 83   58650        346.3390        219.6844    0.7730833      62380 0.6602871
-## 84   98935        387.5169        326.8987    0.5370149     100747 0.7404206
-## 85   77587        396.8076        251.9449    0.7725699      79970 0.7038646
-## 87   71266        390.7072        235.6868    0.7975663      73002 0.6606289
-## 89   35237        267.5538        173.5251    0.7611622      37418 0.7068322
-## 90   49059        301.8004        210.4672    0.7167091      50835 0.6986073
-## 91   53896        319.0720        217.6957    0.7310932      55392 0.7459447
-## 92   56469        325.3414        225.1150    0.7219601      58697 0.6857361
-## 94   67044        361.2554        238.2264    0.7517567      68626 0.7569435
-## 95   52243        331.4511        206.7596    0.7815831      55774 0.7144342
-## 96   38968        269.4020        185.7276    0.7243745      40147 0.7375833
-## 97   79661        360.0734        282.7390    0.6192093      81032 0.7791569
-## 98   59282        329.2426        233.7746    0.7041636      60580 0.7259257
-## 99   48177        305.7845        202.4662    0.7493974      49877 0.6776426
-## 100  74904        342.8963        280.1156    0.5767646      75898 0.7317416
-## 101  81581        424.2783        245.5075    0.8155779      83143 0.7623823
-## 102  57820        376.1912        199.7971    0.8473059      59968 0.7147802
-## 103  57808        309.9717        241.3665    0.6274302      58954 0.7103465
-## 104  55306        353.1546        204.1268    0.8160298      57396 0.7439902
-## 105  59459        347.1552        222.1095    0.7685424      61585 0.7096193
-## 106  44247        319.7903        178.6479    0.8294096      45872 0.6776372
-## 107  48945        269.3704        239.1622    0.4601212      51456 0.7112445
-## 108  68864        343.6762        261.9884    0.6472099      71726 0.6983470
-## 110  65396        331.5384        253.2430    0.6454034      66783 0.7648297
-## 111  81572        393.7162        265.8146    0.7376871      84964 0.6982708
-## 112  44367        322.5040        176.7090    0.8365255      46531 0.7329996
-## 114  50545        286.8713        227.1597    0.6107127      51771 0.8354545
-## 115  94063        448.1211        276.6078    0.7867582      99085 0.7092938
-## 116  84129        413.0346        261.6431    0.7737710      86242 0.7138348
-## 117  79735        410.9979        250.2208    0.7933139      83306 0.7490441
-## 118  90176        390.2073        294.7622    0.6552651      91793 0.7625490
-## 119  61492        356.4260        224.1631    0.7774708      65298 0.6908437
-## 120  79532        367.5260        277.2242    0.6565321      81603 0.7351142
-## 122  52266        320.4426        213.8575    0.7447158      54116 0.6842891
-## 123  51180        288.6311        226.6305    0.6192538      52396 0.7374427
-## 125  96064        411.2071        303.2325    0.6754341      99609 0.7313311
-## 126  54316        351.8053        198.4175    0.8257760      55960 0.6558953
-## 129  47478        299.8186        205.2961    0.7287927      48900 0.7209147
-## 130  88197        473.2867        238.7385    0.8634545      90297 0.6584568
-## 131  74728        355.3105        270.7409    0.6475960      76287 0.7666769
-## 132  70788        362.6508        249.4037    0.7259720      71954 0.7461579
-## 133  48894        318.0989        197.4955    0.7839199      50468 0.6638156
-## 134  52051        313.7033        213.6317    0.7322840      53550 0.6950513
-## 135  53270        336.1489        204.3071    0.7940998      55288 0.6936921
-## 136  57227        354.4311        207.5950    0.8105183      59307 0.6499818
-## 138  58495        368.7395        205.7579    0.8298387      61496 0.6301032
-## 141  49175        281.4314        224.4859    0.6031106      50672 0.7276130
-## 142  53698        348.2232        197.7529    0.8231037      56089 0.7313413
-## 143  73125        408.9408        231.2190    0.8248103      75540 0.6565126
-## 144  50445        308.3589        208.8552    0.7356957      51555 0.7232258
-## 145  46742        303.5552        199.4459    0.7538614      48077 0.7052628
-## 147  75314        392.6516        246.0757    0.7792587      77118 0.7047122
-## 148  54428        339.1147        206.6458    0.7928872      56175 0.7233918
-## 149  39509        286.2316        180.4374    0.7762790      41446 0.7229725
-## 150  66568        342.2504        249.5505    0.6843581      68078 0.7599174
-## 151  45264        290.5884        203.3191    0.7144554      48142 0.6569140
-## 156  83229        423.8444        253.8091    0.8008791      86345 0.6534940
-## 157  45962        251.1334        235.3681    0.3487296      47173 0.7422804
-## 158  57766        344.7374        215.1098    0.7814391      59834 0.7375827
-## 160  41050        316.8416        167.3283    0.8491738      42965 0.6411858
-## 161  47771        311.5250        197.0908    0.7744259      49237 0.6834094
-## 162  53389        301.8459        228.5167    0.6533406      55158 0.7157470
-## 163  73319        392.3627        239.1885    0.7927009      75653 0.7095685
-## 168  41283        268.1254        199.6354    0.6675556      42505 0.7323836
-## 170  44627        297.2593        194.7603    0.7554672      46921 0.6751846
-## 171  84260        411.3974        262.9741    0.7690226      85978 0.6867827
-## 173  58741        345.4854        222.3818    0.7652953      60701 0.7148194
-## 174  68627        411.8885        216.8940    0.8501230      70932 0.7382423
-## 175  51941        349.2262        191.8173    0.8356489      53893 0.7089954
-## 176  77161        394.2784        253.2114    0.7665248      82746 0.6719000
-## 177  85105        382.2900        288.7584    0.6553347      88056 0.7769450
-## 178  52508        297.6969        226.2519    0.6499140      53588 0.7561636
-## 179  39941        251.8477        208.4681    0.5610901      41594 0.7075716
-## 180  48693        306.5739        204.2806    0.7456534      50298 0.7401277
-## 182  67718        373.9241        233.2332    0.7816281      71102 0.7369945
-## 183  63968        333.0124        247.8885    0.6677537      65403 0.7569998
-## 184  43461        333.7059        169.3095    0.8617333      45669 0.6779341
-## 185  81546        381.3487        273.8101    0.6960383      82807 0.7117197
-## 187  36145        280.7577        166.5936    0.8049288      37401 0.8122654
-## 188  57741        316.4840        234.2836    0.6723097      58976 0.7127111
-## 189  69024        372.8220        237.6598    0.7704819      70649 0.7210430
-## 190  78982        421.1618        241.6404    0.8190325      81442 0.7534365
-## 191  78240        401.9301        249.8314    0.7833513      79677 0.7579926
-## 192  87036        384.9699        289.4539    0.6592919      88336 0.7278962
-## 193  37569        232.4278        208.1520    0.4449501      38874 0.7943714
-## 195  44156        307.7070        186.0924    0.7963990      45285 0.6336060
-## 196  87302        392.9101        284.1791    0.6905681      89605 0.7382458
-## 197  69312        373.8031        237.1946    0.7728866      70719 0.7061556
-## 198  86545        350.1279        315.7195    0.4323073      87512 0.7858868
-## 199  59729        337.0435        231.8092    0.7259263      62511 0.6837111
-## 200  59822        336.5841        227.9495    0.7357585      60648 0.7002868
-## 202  61996        333.7476        243.5402    0.6837528      63641 0.6731379
-## 203  74763        391.2272        245.5420    0.7785198      77508 0.6861131
-## 204  73193        401.0723        235.8290    0.8088637      75563 0.7401157
-## 205  66508        344.9045        249.0898    0.6916851      69240 0.7030147
-## 207  38585        274.4451        180.9576    0.7518291      39926 0.6965933
-## 210  49998        301.7807        212.3269    0.7106158      50857 0.7792949
-## 211  49063        294.7483        217.9131    0.6733550      50732 0.6588114
-## 212  46961        343.7885        177.1368    0.8570404      48476 0.6146326
-## 213  57271        372.6991        196.9761    0.8489255      58786 0.7691512
-## 214  58909        347.3439        218.1228    0.7782347      60379 0.7042572
-## 215  51336        321.8844        206.1461    0.7680122      53944 0.7426009
-## 216  62422        324.5570        247.7079    0.6461405      64021 0.7160621
-## 217  48447        331.0510        189.9172    0.8190798      49996 0.6256150
-## 218  64364        376.6625        221.6551    0.8085180      67510 0.6547445
-## 220  49414        290.4582        219.4182    0.6552398      51029 0.7110337
-## 223  56709        293.4085        247.7166    0.5359148      58143 0.7782856
-## 224  93559        438.6344        275.5830    0.7779914      95750 0.6870699
-## 225  81916        398.3266        265.4181    0.7456543      85615 0.6630727
-## 226  79274        406.9762        255.2178    0.7789328      81976 0.7083855
-## 227  88724        446.4305        260.3788    0.8122956      92630 0.6565291
-## 228  65469        374.4662        227.5390    0.7942160      68018 0.7144385
-## 230  76741        383.9822        258.1340    0.7403195      79198 0.7452030
-## 231  54219        344.2908        204.4967    0.8044909      56526 0.6884952
-## 233  84539        441.5289        248.3743    0.8267752      87728 0.6875773
-## 234  34559        264.5152        168.9831    0.7693390      36516 0.6641874
-## 235  49715        302.3474        213.3645    0.7085175      52250 0.6501072
-## 236  39716        243.0383        210.1141    0.5025800      40598 0.7794328
-## 237  46845        264.9673        225.8425    0.5229862      47739 0.7590906
-## 238  52547        358.3657        189.2067    0.8492623      54649 0.7034028
-## 239  41593        310.6749        178.3233    0.8188646      44753 0.5726697
-## 240  44460        294.6241        197.5566    0.7418755      47486 0.6474254
-## 241  51145        317.3482        211.0256    0.7468742      53531 0.7100514
-## 242  43345        323.8592        175.1857    0.8410665      46785 0.6492758
-## 243  53987        331.3507        213.1674    0.7655899      56076 0.6732218
-## 247  46120        300.0972        201.2063    0.7419361      49996 0.6289720
-## 248  57676        333.9700        222.2745    0.7463514      58991 0.6886687
-## 249  62064        352.3687        227.8641    0.7627750      64811 0.6505660
-## 250  50274        305.3973        212.2734    0.7189390      52016 0.6875077
-## 252  45598        259.8963        225.6562    0.4961183      47266 0.7412863
-## 253  38545        283.9875        175.4205    0.7864099      39765 0.7604364
-## 254  39439        246.7636        212.6354    0.5074237      42795 0.6468273
-## 255  74109        416.7127        230.5595    0.8329942      78032 0.7064594
-## 256  41755        296.7884        184.1914    0.7841153      43362 0.6913308
-## 257  61463        369.3997        213.6196    0.8158323      63117 0.7867768
-## 258  43743        300.9063        185.8512    0.7864624      44836 0.6700827
-## 260  40403        289.2593        179.2234    0.7849223      41209 0.7222043
-## 261  62343        348.2888        232.8200    0.7437406      63897 0.7056207
-## 265  61235        349.0264        226.8031    0.7600912      63504 0.7187207
-## 266  78883        395.1001        256.9650    0.7596095      80973 0.6784467
-## 267  58734        367.4839        205.0211    0.8299049      59845 0.7574769
-## 270  73046        397.3382        234.8282    0.8066690      74242 0.6906509
-## 272  84057        452.7757        245.2200    0.8406411      86710 0.6220178
-## 273  90178        466.2494        250.1043    0.8439528      92321 0.7520035
-## 277  77043        388.6927        257.5463    0.7489769      80094 0.7269305
-## 278  64875        393.2147        212.9548    0.8406531      67701 0.7705235
-## 279  42609        280.1490        200.2719    0.6992510      44944 0.6731280
-## 280  79510        380.7192        267.0341    0.7127739      81779 0.7315974
-## 281  58857        320.8119        235.3860    0.6794522      60597 0.6903642
-## 282  67754        349.1971        251.6796    0.6932076      69536 0.6552611
-## 285  72447        401.7420        231.5372    0.8172149      74481 0.7091037
-## 286  58239        324.2951        230.9973    0.7018692      59977 0.7211903
-## 287  93879        409.4869        292.9161    0.6987922      96072 0.7676689
-## 288  68129        381.1755        230.0560    0.7973300      70141 0.6597045
-## 292  65051        381.2140        218.2168    0.8199563      66476 0.6443564
-## 294  81405        421.0949        248.0868    0.8080259      83634 0.7137283
-## 295  70196        373.1976        243.8811    0.7569347      71937 0.6907899
-## 297  56327        297.7657        241.9344    0.5829622      58178 0.7277390
-## 301  87429        408.9260        273.8879    0.7425652      89063 0.7035746
-## 304  81456        404.3164        258.8920    0.7681080      83499 0.7254720
-## 305  61959        339.5850        234.6979    0.7227289      64424 0.7120415
-## 307  62835        421.1693        191.1699    0.8910513      64406 0.7861450
-## 308  52651        340.8170        204.4329    0.8001260      56217 0.6835040
-## 309  67093        353.1099        243.0010    0.7255457      68383 0.7606916
-## 310  45160        270.5554        220.1187    0.5814518      46805 0.6860719
-## 312  44007        359.3755        161.7024    0.8930518      48490 0.6447440
-## 313  65062        344.3098        242.6836    0.7093654      65825 0.7692180
-## 314  38724        291.0011        170.7763    0.8096900      40133 0.7808832
-## 315  63514        368.7863        221.2409    0.8000627      65057 0.6638446
-## 317  55746        280.3131        254.6003    0.4183820      56989 0.7306543
-## 318  38153        265.0402        184.8023    0.7168172      39564 0.6824979
-## 322  55114        317.1723        222.7535    0.7118708      56849 0.7142542
-## 324  72215        380.4148        244.0281    0.7671406      74175 0.7209244
-## 325  65495        365.3190        230.5256    0.7757622      67299 0.6979433
-## 326  34977        267.7377        170.8372    0.7699727      37747 0.6694803
-## 327  76407        373.4424        264.4743    0.7060055      79086 0.7312514
-## 328  66998        338.5866        257.3438    0.6498610      69844 0.7576045
-## 330  79106        404.5732        252.0664    0.7821878      81999 0.7285168
-## 331  56837        368.3727        198.7747    0.8419202      59040 0.6349651
-## 332  53497        352.5028        194.9811    0.8330925      54875 0.6911757
-## 335  72483        334.4176        282.6809    0.5343029      74945 0.7061798
-## 338  83490        421.8829        254.3102    0.7978939      86319 0.7099490
-## 339  74612        430.8652        229.2867    0.8466475      79297 0.6653469
-## 342  89051        418.5556        274.9232    0.7540318      92636 0.7386753
-## 343  57612        352.4414        210.0642    0.8029652      58810 0.6477188
-## 345  69997        362.7414        247.0913    0.7321182      71994 0.7225422
-## 346  75540        422.0985        237.6387    0.8264614      78465 0.7050851
-## 347  46397        310.7244        192.9038    0.7839533      48183 0.6552786
-## 350  67798        418.4081        207.8255    0.8679193      69356 0.6910266
-## 353  46601        277.3533        216.2721    0.6260648      48457 0.7616534
-## 354  53121        350.9684        195.8674    0.8297890      56120 0.7326630
-## 355  80101        377.6166        272.6713    0.6918041      82949 0.7254868
-## 356  69781        364.7445        248.7962    0.7312488      71504 0.6939378
-## 357  58460        290.7536        258.3844    0.4585447      60254 0.7747561
-## 359  78084        395.2098        254.3766    0.7653204      80285 0.7030035
-## 360  63402        372.4843        224.0094    0.7989535      66639 0.6766344
-## 361  48809        332.2649        190.3514    0.8196320      51847 0.6613417
-## 362  49039        285.4021        220.8199    0.6335337      50879 0.7147709
-## 363  64669        364.5828        228.8008    0.7785612      67524 0.6558456
-## 364 103377        460.6704        287.9932    0.7804958     105569 0.7269678
-## 365  73972        359.2727        263.3334    0.6802691      75353 0.7547393
-## 366  47602        296.4930        206.2252    0.7184794      49089 0.7211878
-## 367  69151        341.6461        258.3929    0.6542048      70703 0.7518456
-## 369  86314        390.4130        282.2148    0.6909921      87873 0.7336631
-## 370  56477        334.5881        219.1856    0.7555501      58408 0.6856668
-## 372  71284        356.2592        256.4883    0.6940274      72618 0.7429751
-## 374 100835        419.7534        306.9549    0.6820834     102881 0.7525786
-## 375  66752        370.5036        231.5512    0.7806541      69039 0.7423900
-## 377  70977        362.0636        256.3830    0.7060961      73417 0.6502226
-## 379  53964        368.0741        189.8139    0.8567724      55662 0.6036782
-## 381  83071        400.4657        265.9288    0.7476892      84531 0.7184581
-## 382  31237        262.3471        155.0257    0.8067312      32564 0.6139106
-## 383  26908        245.7558        143.7109    0.8111984      28607 0.6934873
-## 387  65123        382.3577        218.8887    0.8199249      66825 0.7643365
-## 389  68400        363.5065        249.5815    0.7270408      72981 0.7257448
-## 390  64056        393.6168        209.6308    0.8463822      65958 0.7678734
-## 391  49821        319.0821        202.2365    0.7734911      51829 0.6779751
-## 393  51539        330.7475        200.9579    0.7942530      53060 0.7254110
-## 394  63827        393.2517        209.1462    0.8468461      66445 0.6674091
-## 395  89345        435.5509        262.0614    0.7987386      91337 0.7138463
-## 397  75431        433.6712        222.9994    0.8576625      78125 0.7231842
-## 398  72718        397.9029        235.5599    0.8059355      74803 0.7468674
-## 399  82886        424.8227        253.1715    0.8030242      85879 0.6482813
-## 401  49336        338.4815        193.0052    0.8214996      52619 0.6565528
-## 404  91764        433.7682        270.2861    0.7821327      93480 0.6929246
-## 405  79252        398.8446        254.1729    0.7706380      80799 0.7050074
-## 407  66063        354.0975        238.5103    0.7391214      67503 0.7626761
-## 408  73311        391.8675        239.6018    0.7912942      74825 0.6899664
-## 409  82793        428.1169        249.3909    0.8128093      84950 0.7424582
-## 410 104921        452.8630        297.0242    0.7548644     108211 0.7262979
-## 411  59654        350.9000        219.4899    0.7802197      62384 0.7130528
-## 412  76531        407.6686        241.3995    0.8058304      78857 0.7312275
-## 414  55129        336.0217        210.4281    0.7796355      56855 0.7504015
-## 415  37302        284.3301        170.5330    0.8001716      39280 0.7211739
-## 417  33615        254.4722        171.0011    0.7405664      35376 0.7880486
-## 418  47555        330.8993        186.2529    0.8265462      50165 0.6807088
-## 420  84677        401.6681        269.6684    0.7411212      86777 0.7510288
-## 421  86421        367.1703        300.7940    0.5734766      87929 0.7486227
-## 422  90191        431.3670        272.7514    0.7747273      93719 0.6250243
-## 423  34638        251.7422        178.3411    0.7057837      35824 0.7493996
-## 424  39275        274.0660        185.4113    0.7364238      40747 0.7125621
-## 426  85954        405.9152        272.0833    0.7420938      87690 0.7148180
-## 427  56589        343.9348        213.1333    0.7848457      58274 0.6598531
-## 428  39622        280.1125        185.1922    0.7502668      40539 0.7330077
-## 430  67404        349.0113        247.6903    0.7045127      69607 0.7450261
-## 432  58570        355.3995        214.5675    0.7971844      60494 0.6575579
-## 433  60199        375.2797        205.4141    0.8368956      61711 0.7362891
-## 434  74254        402.5265        241.2834    0.8004328      76702 0.7264705
-## 436  28216        245.4013        150.2456    0.7906685      30316 0.6222928
-## 437  79055        395.3687        258.2760    0.7571393      82562 0.7195060
-## 438  86141        414.1072        266.9075    0.7645728      87883 0.7187401
-## 439  82873        449.4093        239.6141    0.8460046      85648 0.7007695
-## 440  98485        387.7628        325.7372    0.5425210     100682 0.7298645
-## 441  53633        313.4800        218.6686    0.7165340      55147 0.7284321
-## 442  63191        335.2417        243.9724    0.6858417      64898 0.7046040
-## 443  58545        325.1886        231.9558    0.7008628      60738 0.7005001
-## 444  68931        381.6717        231.5282    0.7949950      71336 0.6793105
-## 445  67874        360.0235        243.2720    0.7371662      69889 0.6783194
-## 446  61200        323.1744        246.2883    0.6474699      64553 0.7074490
-## 448  59589        383.5712        201.3819    0.8510910      62974 0.6840818
-## 451 137583        649.5415        273.2603    0.9072011     142650 0.7316377
-## 452 117592        533.2929        288.5583    0.8409660     123587 0.7300677
-## 453  95546        487.1783        251.9602    0.8558749      99166 0.7227820
-## 454  96582        446.7052        278.3255    0.7821716     100113 0.7065976
-## 455  61409        403.7013        209.3659    0.8550074      67286 0.5973929
-## 456 154242        585.9281        337.5992    0.8173238     158371 0.7216000
-## 460  83107        507.3809        233.1538    0.8881652      93706 0.4910020
-## 461 107178        508.7479        270.4624    0.8469807     110611 0.6329086
-## 462  64391        449.5559        187.1224    0.9092556      68813 0.6342691
-## 464  45051        323.5893        180.0697    0.8308635      46532 0.8306322
-## 466  67579        402.3102        217.0587    0.8419659      70809 0.7031130
-## 468 184784        740.1087        320.5878    0.9013155     192699 0.6453533
-## 470 195383        755.0129        335.7905    0.8956558     204472 0.7287691
-## 474 157877        613.8737        328.3133    0.8449646     161901 0.6413228
-## 475  83800        440.8337        245.3819    0.8307596      86346 0.6571621
-## 477 127245        530.3041        309.1215    0.8125340     130649 0.6790964
-## 478 108314        455.6059        311.1711    0.7304342     112497 0.6869447
-## 480 189637        636.7524        403.7193    0.7733095     209580 0.6137855
-## 481 137508        604.1144        292.0961    0.8753382     141818 0.6015223
-## 482  75173        365.8032        267.5828    0.6818482      78359 0.6799540
-## 483 115859        488.4889        305.0908    0.7809765     120546 0.7426431
-## 484  92188        374.7202        324.3026    0.5009907      95920 0.7475996
-## 485 153824        536.6070        369.2865    0.7255325     159063 0.7390836
-## 486  85492        437.0140        250.8926    0.8187806      89018 0.7233438
-## 487 106312        464.3324        295.3168    0.7716866     111089 0.7296837
-## 488 210923        984.0455        367.2795    0.9277371     278217 0.5073521
-## 490  83567        465.1015        230.9042    0.8680597      86859 0.6092221
-## 491 171256        531.3732        412.3828    0.6306467     174277 0.7019149
-## 492  77105        419.9537        238.8395    0.8225256      80497 0.6689948
-## 493 100443        457.5699        283.6113    0.7847435     104186 0.6737885
-## 495  83555        457.5465        235.0999    0.8578936      86694 0.7112274
-## 496 146268        588.0092        321.6080    0.8371693     150416 0.6954215
-## 497 113608        559.2668        264.0287    0.8815461     118098 0.6278628
-## 499 116406        612.6653        251.8328    0.9116152     125638 0.5262596
-## 501 143386        469.2765        397.3102    0.5321595     146328 0.7502603
-## 503  71639        400.4140        231.6201    0.8157166      76252 0.6424619
-## 504 141220        575.6824        316.6212    0.8351693     144300 0.6591519
-## 505  88290        514.4362        221.4448    0.9026091      92317 0.5551573
-## 506 102569        515.3952        259.1942    0.8643424     106888 0.5732418
-## 507 182160        997.2919        271.8724    0.9621244     221527 0.3798561
-## 508 208264        675.0983        395.5793    0.8103414     212813 0.7717483
-## 509 133101        641.5097        265.3140    0.9104689     136793 0.5824964
-## 510 169009        719.5059        301.5651    0.9079271     174718 0.7169266
-## 511  81901        450.8275        237.2090    0.8503834      85000 0.5831079
-## 512  80678        457.9252        229.7036    0.8650892      85201 0.6073596
-## 513 101661        440.9818        295.5307    0.7422119     105429 0.7132904
-## 516 188651        621.0127        390.3076    0.7778081     192922 0.7471563
-## 521 155702        655.3990        304.6121    0.8854295     160709 0.6970462
-## 522  84295        458.8440        238.2890    0.8545770      88521 0.7084506
-## 524 110897        518.7876        275.2605    0.8476322     115550 0.7304361
-## 525  56903        360.8153        204.0377    0.8247546      59797 0.7184269
-## 526 113029        558.5162        265.2842    0.8799964     116783 0.6620918
-## 528 163442        594.7592        351.4257    0.8067664     167471 0.7046858
-## 532 104352        562.3359        239.4026    0.9048508     107968 0.6680666
-## 534 131816        532.7314        322.6830    0.7956823     138992 0.7221924
-## 535 163082        696.1490        302.2224    0.9008480     167442 0.7637786
-## 536  77012        425.2194        239.4696    0.8263431      81325 0.6542798
-## 538  82853        430.1150        251.1757    0.8117728      85292 0.7464369
-## 539 145693        591.1801        321.4312    0.8392725     151644 0.6485275
-## 540  96443        541.2001        232.5480    0.9029767     101271 0.5534114
-## 541 168620        730.7610        295.5005    0.9145939     172003 0.7967303
-## 542 193032        661.1488        376.4322    0.8220878     197672 0.6311205
-## 543 140897        588.0709        308.0258    0.8518473     146231 0.7339991
-## 544 118988        483.3400        315.2485    0.7580218     122375 0.7844673
-## 545 103666        456.3827        293.9224    0.7650034     107992 0.6472652
-## 546  68231        394.6465        228.1610    0.8159375      71591 0.6645273
-## 547  88928        395.7250        300.2270    0.6514683      93821 0.6710636
-## 548 117077        496.1308        314.5474    0.7733322     123305 0.7088316
-## 550  94455        496.8950        245.2439    0.8697159      97496 0.7198875
-## 552  68982        400.7369        223.9077    0.8293430      73278 0.7287652
-## 553 204864        596.6398        440.4971    0.6744762     209457 0.7510090
-## 555  75529        418.5185        233.9902    0.8291059      79168 0.6586697
-## 556 121034        518.7204        305.7358    0.8078386     125665 0.7066647
-## 557 105192        440.5629        305.7918    0.7198850     107313 0.7369018
-## 558  77402        469.4593        215.0800    0.8888780      80680 0.6213285
-## 559  87857        380.7765        300.9086    0.6127845      90968 0.7284992
-## 560 139399        522.4680        348.2822    0.7454071     144034 0.6936309
-## 561 178334        626.0642        366.2370    0.8110454     181715 0.7894518
-## 562 144084        555.9210        332.1239    0.8019211     149076 0.7294211
-## 563  84975        511.8747        215.4482    0.9071069      88730 0.6296123
-## 564 118043        493.7652        308.0001    0.7816012     122903 0.6755969
-## 565 102769        515.6081        261.1367    0.8622614     109161 0.6502309
-## 566 136960        559.2959        313.3099    0.8283667     139458 0.7221420
-## 568 155057        610.6780        325.5077    0.8460984     159681 0.7610570
-## 570  91146        498.3918        241.8968    0.8743174      97149 0.6728926
-## 571 101223        496.5335        276.8662    0.8301109     109593 0.7136119
-## 572  79492        422.5673        243.1163    0.8179203      82708 0.6373535
-## 573  93234        452.9265        268.7631    0.8049135      97428 0.7159070
-## 574 167279        690.0720        311.9957    0.8919569     171794 0.5786739
-## 576 146175        592.9085        319.0201    0.8429068     149156 0.6328333
-## 577 108076        516.0732        270.7434    0.8513352     112975 0.6988154
-## 578 131811        573.5418        295.4231    0.8571388     135814 0.7115073
-## 580 130868        613.1726        273.1819    0.8952710     134139 0.5367842
-## 583 146420        598.0727        314.3906    0.8506867     149403 0.7467360
-## 585 101103        484.1659        269.1459    0.8312519     105500 0.6700000
-## 586  61444        371.6938        213.1798    0.8191803      64321 0.7374725
-## 588 100649        433.3669        300.4578    0.7206390     103883 0.7247192
-## 589 112808        542.5048        267.2019    0.8702934     116961 0.7431553
-## 591 177916        581.7097        394.5247    0.7348629     181352 0.7372067
-## 592 109254        483.1637        289.8287    0.8001080     111624 0.7401030
-## 594 124166        525.9454        304.1565    0.8158211     126960 0.7289988
-## 596  80481        481.0640        217.5612    0.8918912      85153 0.7149736
-## 597  63491        326.6329        248.3224    0.6496313      64892 0.7343566
-## 598 109791        477.0335        294.5338    0.7866274     112766 0.7447800
-## 599  89236        389.6817        295.3319    0.6523941      92014 0.6969929
-## 600 152267        598.9676        331.2490    0.8331592     157353 0.5940504
-## 601  89721        530.1566        223.4999    0.9067943      95252 0.5474331
-## 602 129493        497.7881        339.5263    0.7312870     136555 0.6475298
-## 603  74966        465.3608        209.2796    0.8931722      78159 0.7124149
-## 604 136180        551.4538        316.4698    0.8189375     139701 0.7298902
-## 606 169078        644.9313        336.5716    0.8530238     173362 0.6829889
-## 607  78304        390.9731        262.7704    0.7404664      82394 0.6232857
-## 608  54321        395.0118        182.3240    0.8871059      58632 0.6250690
-## 609 101439        524.8172        251.1606    0.8780507     107520 0.7333116
-## 612  72653        403.1910        231.0557    0.8195080      74718 0.6638979
-## 615  62451        337.2900        237.7054    0.7094549      64499 0.6962751
-## 617 199015        615.4172        413.9275    0.7400094     201464 0.7685698
-## 619 106440        501.0443        273.1941    0.8382739     108790 0.7507512
-## 620 109878        541.9484        260.0836    0.8773206     112825 0.6891927
-## 621  78984        427.4943        236.8826    0.8324377      82328 0.6984172
-## 623 193818        678.5596        367.9004    0.8402634     201241 0.7915462
-## 624 137788        654.4703        272.3013    0.9093355     141442 0.7064312
-## 628 104602        478.2227        279.3610    0.8116348     106906 0.7799135
-## 630  83059        440.5600        243.6365    0.8331709      88806 0.6858089
-## 631  99378        466.3975        275.5756    0.8067741     102653 0.6870381
-## 632  90585        489.6478        239.3503    0.8723839      95774 0.6723447
-## 635 169645        731.5619        299.4134    0.9124090     174278 0.7555157
-## 636  70461        376.1708        243.9548    0.7611965      72819 0.7282791
-## 638 160583        630.6452        326.2445    0.8557929     165385 0.7518987
-## 639 101772        477.9089        273.4044    0.8201946     104567 0.6843379
-## 640  61123        329.3302        257.2681    0.6242986      70556 0.7232635
-## 641  90375        480.6325        241.0168    0.8651823      93826 0.6435591
-## 643  81998        423.6326        251.2394    0.8051585      83932 0.7294806
-## 644 105924        497.7006        274.5758    0.8340501     109179 0.7165354
-## 645 121757        486.5211        323.3517    0.7471814     125067 0.7599126
-## 646 116198        494.2592        301.6829    0.7921134     118786 0.7193675
-## 647  86846        459.3960        242.6200    0.8491647      89047 0.7259308
-## 648  77799        419.3386        238.3433    0.8227669      80688 0.6480010
-## 649  75242        391.6781        248.0891    0.7738242      77890 0.6681763
-## 650 113164        486.7664        297.1103    0.7921122     116531 0.7395615
-## 651 194864        657.8678        378.0585    0.8183836     197430 0.7864269
-## 655 169880        648.9042        339.1311    0.8525650     177170 0.7137665
-## 656  69746        370.5605        241.9145    0.7575011      72724 0.7126028
-## 657 172334        595.8177        375.0205    0.7770640     174610 0.6361113
-## 658 192815        731.4403        337.1024    0.8874652     196576 0.7343990
-## 659  92121        432.0619        275.6906    0.7699690      95197 0.7154473
-## 662 151703        595.1071        330.3428    0.8317850     156402 0.6713086
-## 663  40702        274.1690        191.3784    0.7160677      41924 0.7216155
-## 664  81480        434.1003        242.7018    0.8291060      84581 0.6740123
-## 665 104669        546.6728        248.5279    0.8906859     110984 0.6873457
-## 666  85390        403.7297        272.9703    0.7367902      88615 0.7104998
-## 667 178692        594.7222        384.0380    0.7635543     181288 0.7470464
-## 668 104385        488.8976        277.6837    0.8230428     108197 0.7721698
-## 669 206689        746.1453        355.3007    0.8793470     212569 0.7458089
-## 670  98166        420.7022        299.5836    0.7020742     100659 0.7074262
-## 671 156769        662.9666        307.8681    0.8856363     161782 0.7421088
-## 674  99177        494.0552        260.9736    0.8491027     104468 0.6141751
-## 675  76114        435.3879        224.7276    0.8564952      77824 0.6819273
-## 676 111056        514.7145        277.8791    0.8417482     114995 0.6707860
-## 678 144973        614.8149        304.3315    0.8688947     150534 0.7336690
-## 679 182788        621.2068        379.4244    0.7917957     188848 0.7330609
-## 683 106923        591.1158        234.8233    0.9177085     111428 0.5222788
-## 685  88257        452.9246        254.4822    0.8272294      92886 0.7360884
-## 686 102868        430.0261        312.9726    0.6857904     106439 0.7179308
-## 688 129292        614.5474        270.0855    0.8982490     133475 0.6896898
-## 691  88250        478.4818        238.3219    0.8671315      92397 0.6066001
-## 692 141137        600.1261        305.7668    0.8604681     145158 0.5855894
-## 693 123980        531.8683        332.5762    0.7803860     138078 0.6676216
-## 694  49371        320.6434        200.2456    0.7810154      52692 0.6751220
-## 695 172783        820.7240        352.1937    0.9032448     219952 0.4969370
-## 696  86852        456.4787        248.6069    0.8386837      90550 0.6078540
-## 697  91464        433.2198        273.2555    0.7759822      93852 0.7177024
-## 698  93441        396.7908        300.8126    0.6521222      95370 0.7233171
-## 700 124630        585.0938        275.4936    0.8822113     128308 0.6818319
-## 701 116361        554.4901        277.0669    0.8662108     125132 0.7474130
-## 702 152992        572.7054        341.2457    0.8030968     155411 0.7775248
-## 704 135036        582.6875        301.5685    0.8556545     139124 0.6345677
-## 706  79975        439.3125        240.4942    0.8368495      83384 0.6911616
-## 707  60674        345.3152        225.2188    0.7580365      62614 0.7355762
-## 708  96404        470.1017        264.2362    0.8270808      99678 0.7545474
-## 709 222915        731.5594        389.9467    0.8460933     227170 0.7705430
-## 710 108379        482.5656        289.3857    0.8002387     111707 0.7027102
-## 711  62562        407.9393        198.7101    0.8733422      64694 0.6282587
-## 712 204226        648.2043        402.2833    0.7841179     207198 0.7739879
-## 713  77985        473.3407        214.0920    0.8918658      82967 0.6743774
-## 714 104728        495.6717        272.6867    0.8350752     109157 0.7302189
-## 715  85449        471.1247        238.3287    0.8626087      89794 0.5847705
-## 717  97049        548.2208        231.6610    0.9063309     102899 0.6163015
-## 718  58870        355.1360        212.0295    0.8022135      60490 0.7349563
-## 719  83889        450.9890        241.3304    0.8447800      88842 0.7298250
-## 721  66793        362.2312        236.4044    0.7576733      69506 0.6841092
-## 723 126149        478.8771        345.9200    0.6915209     134778 0.6249084
-## 725  96442        450.4081        276.9226    0.7886628     100712 0.7030581
-## 727  86658        439.2291        258.3043    0.8087986      89048 0.6997578
-## 728 113046        548.9408        265.3051    0.8754528     116819 0.6771817
-## 729  53373        330.6772        215.7016    0.7579586      56639 0.6542813
-## 730  80274        404.3025        256.0625    0.7738706      84523 0.6635421
-## 731  89431        464.8339        247.3520    0.8466627      92412 0.6247974
-## 732  84383        403.9094        271.2515    0.7409455      87629 0.6749452
-## 733  98260        520.1031        245.2098    0.8818854     103918 0.5764571
-## 734 104656        489.4542        273.4527    0.8293773     106961 0.7416100
-## 735 100186        462.5059        277.6991    0.7996827     101921 0.6822429
-## 737 117301        507.2404        296.8299    0.8108993     122361 0.6184022
-## 738  48007        302.6110        209.1161    0.7228173      50679 0.6770513
-## 741 109701        546.6353        256.6147    0.8829622     113425 0.5806252
-## 742 117098        637.7702        237.4718    0.9280936     120417 0.6528657
-## 744 102944        477.1675        277.2225    0.8139213     108053 0.7156841
-## 746  78161        453.2034        222.6050    0.8710574      81689 0.7334929
-## 747 122433        585.2942        270.7088    0.8866102     128445 0.5794932
-## 748 142069        662.7138        275.4397    0.9095366     148697 0.7322767
-## 749  82585        436.1824        264.8741    0.7945068      93928 0.5884470
-## 750  96753        477.4997        261.9434    0.8361027      99964 0.6941073
-## 753  49691        336.6781        189.2617    0.8270391      52077 0.7249504
-## 756 171749        671.2546        328.9099    0.8717265     175679 0.7381593
-## 759  97254        422.0441        305.8751    0.6890152     100815 0.6333496
-## 760 132116        519.6800        325.3325    0.7798033     133811 0.7450711
-## 761 132730        535.9809        324.9589    0.7952450     139810 0.6885586
-## 764 109438        502.7293        280.3437    0.8300806     113476 0.6354731
-## 766 121080        573.4036        270.6325    0.8816116     124432 0.7237904
-## 771 131496        506.1154        334.3318    0.7507521     134210 0.7055226
-## 774 106938        498.4339        274.5903    0.8345672     110118 0.7731874
-## 775  76624        473.9660        207.7370    0.8988311      80356 0.6610076
-## 776  88747        425.0073        268.6685    0.7748458      92317 0.7613128
-## 777 165940        624.8450        340.6956    0.8382746     170781 0.7794636
-## 778 181926        579.9186        400.8017    0.7227263     185474 0.7168085
-## 779 148073        599.3628        327.0841    0.8379678     152985 0.6901561
-## 780 103915        516.4855        260.1054    0.8639332     106499 0.6910850
-## 781  71141        417.1370        219.1853    0.8508236      73629 0.7254548
-## 782 169494        614.9937        352.2808    0.8196811     172094 0.7401226
-## 784 102960        522.3810        252.3654    0.8755619     105956 0.7416585
-## 787 141613        588.3716        311.2962    0.8485714     149492 0.7217935
-## 788 105961        497.7015        275.9717    0.8321887     109992 0.6975616
-## 789 125282        536.4990        299.4368    0.8297527     129758 0.7359486
-## 791 108771        472.2082        294.4539    0.7817692     111241 0.7700493
-## 793  92024        453.7152        260.4861    0.8187726      94643 0.7518608
-## 798  93042        470.5658        254.2608    0.8414532      95156 0.6323967
-## 799  71054        364.7511        249.7234    0.7288810      72956 0.7278482
-## 800  90675        426.2364        275.2871    0.7634598      92030 0.7401074
-## 802 164440        580.7758        362.3456    0.7815048     167563 0.7704273
-## 803  71502        490.4335        189.4429    0.9223830      75157 0.5005460
-## 805 223075        694.2476        411.8104    0.8050735     225916 0.7649405
-## 806  56244        398.8025        182.8440    0.8887033      58530 0.6563660
-## 807 142239        614.8345        297.7353    0.8749281     148078 0.6435164
-## 808  78632        407.9403        245.8212    0.7980501      79715 0.6890110
-## 809  93430        467.6371        258.9472    0.8326928      98337 0.7129884
-## 810  97583        522.7866        241.9408    0.8864676     101231 0.7259830
-## 811 123654        542.4197        293.4732    0.8409939     126325 0.6595302
-## 812  85894        477.1720        231.0397    0.8749655      89369 0.7303912
-## 813 235047        772.9569        388.2015    0.8647345     239093 0.7116727
-## 814 152611        663.1333        297.4180    0.8937808     158488 0.6147150
-## 815  83932        499.2378        224.4724    0.8932148      88572 0.6708442
-## 817  66315        363.5789        234.4545    0.7643078      68906 0.6889441
-## 818  87663        405.6781        277.4549    0.7295487      89710 0.7436883
-## 820  78787        450.2556        228.9125    0.8611177      80567 0.6773764
-## 821 160451        593.7499        346.7571    0.8117450     163523 0.7852312
-## 822 121077        521.1910        302.1092    0.8148645     125856 0.7345123
-## 824 106897        481.7947        288.6600    0.8006481     109314 0.7159831
-## 826  61556        340.7836        231.4352    0.7340213      63181 0.7348040
-## 827  47609        331.8941        184.2131    0.8318264      49720 0.7481927
-## 828  61861        345.9436        235.4305    0.7327056      67390 0.7022796
-## 830 127292        639.8506        258.3819    0.9148402     129101 0.5347145
-## 831 125968        522.5438        308.0476    0.8077571     129444 0.7395787
-## 835 145235        609.6302        306.6080    0.8643207     148876 0.6824953
-## 836  87039        497.0581        236.2128    0.8798661      96247 0.6369810
-## 837 181126        949.6627        293.3867    0.9510822     225592 0.4141537
-## 838 142419        580.4382        318.1806    0.8363650     145899 0.7548577
-## 840  68510        348.4010        252.9930    0.6875313      70513 0.6708774
-## 841  48551        302.8128        205.9634    0.7330569      50748 0.7428244
-## 842  92472        424.4200        282.2115    0.7469017      95982 0.7461632
-## 843 100928        465.1799        287.0157    0.7869637     105549 0.6861929
-## 844  96920        447.5951        277.4359    0.7847308     100285 0.6872589
-## 845  96762        457.4775        277.3868    0.7952057     101717 0.7886835
-## 846 151908        594.1828        328.5681    0.8331980     155600 0.7212078
-## 847  75368        387.8523        250.5845    0.7632677      77706 0.7350968
-## 848 168269        614.3804        353.4663    0.8179273     173527 0.7562414
-## 849  99333        422.8769        302.2096    0.6994808     101942 0.7207654
-## 851 104468        542.1782        250.0631    0.8872861     108119 0.6469328
-## 852  73699        408.5856        231.1421    0.8246023      76106 0.7031811
-## 855  73294        445.2461        217.6202    0.8724161      76157 0.6544341
-## 856 189069        679.4893        357.0473    0.8508158     195810 0.6121432
-## 858 120818        492.6065        315.2013    0.7684879     123230 0.6720325
-## 859  59890        402.4157        194.6688    0.8752059      61673 0.7197106
-## 860 137593        558.0588        316.7128    0.8233555     142114 0.6777646
-## 862  55858        298.8589        239.8994    0.5963587      58630 0.6814527
-## 863 105308        473.3134        284.1706    0.7997105     108094 0.7870141
-## 864  67468        424.5637        207.8231    0.8720044      70674 0.6116939
-## 865 132680        549.8653        308.3923    0.8279170     136612 0.6506537
-## 866 154197        582.6122        343.2602    0.8080059     160008 0.7622195
-## 867 225043        740.0037        390.3009    0.8495979     229195 0.7441874
-## 868  66613        433.1942        199.8147    0.8872655      70454 0.7089506
-## 869 141559        594.1144        306.3100    0.8568450     146674 0.7644895
-## 870  77622        460.1429        226.5813    0.8703605      82990 0.6512131
-## 871 179668        690.4334        332.5533    0.8763589     181954 0.7794031
-## 872 105091        507.6851        268.0873    0.8492081     108296 0.7002705
-## 873  66938        356.3233        248.6742    0.7162055      69880 0.7086611
-## 874  97494        451.7828        278.2800    0.7877776     101878 0.6896957
-## 875 101770        468.6679        279.8129    0.8022124     103475 0.7851775
-## 876  88338        504.4822        227.1275    0.8929181      90790 0.7271575
-## 877 119336        563.5463        275.3558    0.8725009     125523 0.6681560
-## 878 126019        520.6800        316.1899    0.7945007     130948 0.6945109
-## 881 218459        571.2892        492.2753    0.5074318     228259 0.7319737
-## 882 150420        607.7097        316.8097    0.8533628     153905 0.6424087
-## 883 110296        487.6912        289.9248    0.8041071     113271 0.6870997
-## 885 110936        500.9313        286.2524    0.8206436     113888 0.7323959
-## 886  54502        346.4580        204.0812    0.8080963      56464 0.6361111
-## 887 142415        532.0841        342.4207    0.7654072     144862 0.7706439
-## 888  94282        494.1630        244.8039    0.8686701      97707 0.7023862
-## 890  79058        454.4372        236.9643    0.8532846      82555 0.5782560
-## 892 107486        462.8131        296.0912    0.7685713     108914 0.7599675
-## 893 149703        637.8730        304.6225    0.8785992     154549 0.5938050
-## 894 187391        660.6556        362.3150    0.8362047     189799 0.7139466
-## 895 115272        511.4720        291.5913    0.8215738     119773 0.6247602
-## 896  83248        430.0773        247.8387    0.8172626      85839 0.6687929
-## 898  99657        431.7070        298.8373    0.7216841     106264 0.7410985
-## 900  85609        512.0818        215.2720    0.9073454      89197 0.6320200
-##     Perimeter
-## 3    1208.575
-## 7     823.796
-## 8     933.366
-## 9     849.728
-## 10    981.544
-## 11   1176.305
-## 12    818.873
-## 13    803.748
-## 15   1084.729
-## 16    751.413
-## 17   1028.445
-## 18    981.509
-## 19    814.680
-## 20   1061.321
-## 21   1035.501
-## 22    928.272
-## 23   1106.355
-## 24    971.769
-## 26   1059.186
-## 27   1010.474
-## 28    964.603
-## 30    982.788
-## 31   1162.877
-## 32    828.697
-## 33   1075.792
-## 35    844.312
-## 37    926.095
-## 39   1100.676
-## 40    843.764
-## 41   1201.390
-## 42   1036.940
-## 45   1141.189
-## 46    992.114
-## 47   1022.568
-## 49    870.387
-## 51    845.786
-## 53   1030.155
-## 54    901.102
-## 56    861.580
-## 57    952.023
-## 59   1039.551
-## 61   1003.374
-## 62    868.060
-## 63   1157.330
-## 65    990.547
-## 67    912.153
-## 68   1179.694
-## 69    903.308
-## 73   1086.857
-## 74   1049.093
-## 75    894.480
-## 77   1081.339
-## 80    860.402
-## 81    896.728
-## 82    957.132
-## 83    991.612
-## 84   1176.600
-## 85   1100.836
-## 87   1034.183
-## 89    750.909
-## 90    867.582
-## 91    889.626
-## 92    933.896
-## 94    989.016
-## 95    934.547
-## 96    769.242
-## 97   1045.658
-## 98    920.573
-## 99    860.548
-## 100  1012.365
-## 101  1114.736
-## 102   978.850
-## 103   911.857
-## 104   973.259
-## 105   966.329
-## 106   842.121
-## 107   872.289
-## 108  1035.022
-## 110   975.425
-## 111  1187.338
-## 112   883.973
-## 114   847.664
-## 115  1259.451
-## 116  1144.973
-## 117  1154.540
-## 118  1136.669
-## 119  1013.202
-## 120  1075.271
-## 122   923.190
-## 123   855.997
-## 125  1223.904
-## 126   930.627
-## 129   861.179
-## 130  1193.280
-## 131  1048.675
-## 132  1003.769
-## 133   875.174
-## 134   893.451
-## 135   922.011
-## 136   953.496
-## 138   998.437
-## 141   845.128
-## 142   938.705
-## 143  1096.751
-## 144   851.632
-## 145   847.792
-## 147  1073.768
-## 148   922.878
-## 149   790.531
-## 150   993.455
-## 151   879.832
-## 156  1153.434
-## 157   810.195
-## 158   950.721
-## 160   846.833
-## 161   857.776
-## 162   906.666
-## 163  1075.279
-## 168   798.515
-## 170   848.487
-## 171  1157.001
-## 173   948.233
-## 174  1097.292
-## 175   912.259
-## 176  1127.409
-## 177  1139.446
-## 178   862.778
-## 179   777.663
-## 180   848.422
-## 182  1024.993
-## 183   953.445
-## 184   867.446
-## 185  1057.448
-## 187   747.161
-## 188   906.829
-## 189  1015.771
-## 190  1102.423
-## 191  1059.644
-## 192  1094.590
-## 193   734.102
-## 195   820.714
-## 196  1122.160
-## 197  1001.236
-## 198  1070.062
-## 199   966.438
-## 200   916.044
-## 202   958.627
-## 203  1063.377
-## 204  1050.909
-## 205  1001.714
-## 207   762.439
-## 210   834.328
-## 211   869.795
-## 212   891.528
-## 213   949.936
-## 214   944.879
-## 215   898.546
-## 216   947.541
-## 217   883.044
-## 218  1057.897
-## 220   869.188
-## 223   904.508
-## 224  1198.259
-## 225  1113.144
-## 226  1110.378
-## 227  1216.535
-## 228  1020.029
-## 230  1056.740
-## 231   931.430
-## 233  1169.983
-## 234   750.365
-## 235   877.430
-## 236   737.468
-## 237   799.991
-## 238   929.471
-## 239   870.063
-## 240   849.225
-## 241   895.040
-## 242   877.020
-## 243   931.117
-## 247   907.025
-## 248   926.255
-## 249  1004.245
-## 250   868.951
-## 252   813.276
-## 253   770.590
-## 254   793.005
-## 255  1095.055
-## 256   804.559
-## 257   966.493
-## 258   802.261
-## 260   761.949
-## 261   979.447
-## 265   974.079
-## 266  1092.709
-## 267   945.191
-## 270  1037.399
-## 272  1179.024
-## 273  1180.478
-## 277  1112.212
-## 278  1014.789
-## 279   840.167
-## 280  1075.307
-## 281   927.048
-## 282  1032.358
-## 285  1055.302
-## 286   940.220
-## 287  1174.166
-## 288  1050.867
-## 292  1002.035
-## 294  1148.651
-## 295  1024.256
-## 297   915.496
-## 301  1120.019
-## 304  1103.153
-## 305   970.754
-## 307  1018.553
-## 308   915.939
-## 309   972.971
-## 310   833.117
-## 312   901.170
-## 313   948.889
-## 314   769.691
-## 315   977.085
-## 317   875.659
-## 318   754.022
-## 322   909.604
-## 324  1048.486
-## 325   989.581
-## 326   754.366
-## 327  1074.702
-## 328  1006.220
-## 330  1100.850
-## 331   973.599
-## 332   921.762
-## 335  1052.159
-## 338  1168.247
-## 339  1140.399
-## 342  1196.030
-## 343   934.684
-## 345  1010.809
-## 346  1114.880
-## 347   850.782
-## 350  1073.138
-## 353   820.106
-## 354   930.619
-## 355  1084.306
-## 356  1024.207
-## 357   908.357
-## 359  1097.299
-## 360  1008.276
-## 361   928.016
-## 362   841.666
-## 363   995.692
-## 364  1230.233
-## 365  1017.749
-## 366   840.545
-## 367   989.917
-## 369  1106.033
-## 370   941.429
-## 372  1011.054
-## 374  1202.369
-## 375  1006.028
-## 377  1033.870
-## 379   943.599
-## 381  1112.784
-## 382   718.847
-## 383   678.815
-## 387  1018.353
-## 389  1079.973
-## 390  1014.268
-## 391   907.423
-## 393   894.039
-## 394  1047.037
-## 395  1176.657
-## 397  1103.236
-## 398  1073.916
-## 399  1163.528
-## 401   909.681
-## 404  1165.084
-## 405  1074.108
-## 407   971.938
-## 408  1046.520
-## 409  1130.673
-## 410  1254.861
-## 411   979.727
-## 412  1068.375
-## 414   910.837
-## 415   761.131
-## 417   719.935
-## 418   873.837
-## 420  1118.999
-## 421  1080.007
-## 422  1179.374
-## 423   713.940
-## 424   772.501
-## 426  1104.717
-## 427   931.451
-## 428   766.531
-## 430   997.276
-## 432   962.708
-## 433   971.185
-## 434  1080.034
-## 436   683.004
-## 437  1114.488
-## 438  1146.164
-## 439  1148.363
-## 440  1193.908
-## 441   882.669
-## 442   977.095
-## 443   966.758
-## 444  1067.692
-## 445  1035.277
-## 446   997.264
-## 448  1043.187
-## 451  1590.354
-## 452  1432.006
-## 453  1276.807
-## 454  1216.979
-## 455  1083.477
-## 456  1530.315
-## 460  1367.331
-## 461  1325.947
-## 462  1177.714
-## 464   836.625
-## 466  1051.553
-## 468  1791.568
-## 470  1893.414
-## 474  1604.103
-## 475  1170.091
-## 477  1423.997
-## 478  1306.577
-## 480  1870.280
-## 481  1529.790
-## 482  1087.034
-## 483  1351.422
-## 484  1190.813
-## 485  1582.146
-## 486  1182.575
-## 487  1306.455
-## 488  2697.753
-## 490  1199.017
-## 491  1559.214
-## 492  1131.540
-## 493  1269.066
-## 495  1159.779
-## 496  1535.287
-## 497  1394.088
-## 499  1480.951
-## 501  1422.014
-## 503  1101.879
-## 504  1507.939
-## 505  1277.388
-## 506  1331.797
-## 507  2303.690
-## 508  1755.167
-## 509  1544.712
-## 510  1781.378
-## 511  1192.014
-## 512  1226.244
-## 513  1268.050
-## 516  1698.394
-## 521  1626.909
-## 522  1202.583
-## 524  1365.577
-## 525   980.390
-## 526  1419.577
-## 528  1621.959
-## 532  1390.730
-## 534  1488.840
-## 535  1687.178
-## 536  1131.530
-## 538  1139.840
-## 539  1595.364
-## 540  1352.482
-## 541  1725.003
-## 542  1744.271
-## 543  1536.473
-## 544  1356.398
-## 545  1332.203
-## 546  1099.228
-## 547  1239.540
-## 548  1419.160
-## 550  1256.322
-## 552  1105.790
-## 553  1726.246
-## 555  1143.294
-## 556  1418.304
-## 557  1244.054
-## 558  1162.004
-## 559  1144.344
-## 560  1471.508
-## 561  1630.704
-## 562  1506.255
-## 563  1246.361
-## 564  1394.100
-## 565  1378.308
-## 566  1458.551
-## 568  1564.694
-## 570  1293.559
-## 571  1345.426
-## 572  1122.831
-## 573  1222.886
-## 574  1680.121
-## 576  1529.068
-## 577  1378.774
-## 578  1457.016
-## 580  1513.352
-## 583  1531.955
-## 585  1307.683
-## 586  1006.984
-## 588  1257.029
-## 589  1390.400
-## 591  1647.505
-## 592  1293.225
-## 594  1388.684
-## 596  1219.105
-## 597   950.297
-## 598  1290.239
-## 599  1144.036
-## 600  1570.502
-## 601  1295.377
-## 602  1447.684
-## 603  1157.089
-## 604  1461.030
-## 606  1629.634
-## 607  1137.706
-## 608  1021.989
-## 609  1393.213
-## 612  1062.070
-## 615   963.009
-## 617  1687.866
-## 619  1302.472
-## 620  1369.202
-## 621  1169.476
-## 623  1766.873
-## 624  1562.268
-## 628  1263.012
-## 630  1238.163
-## 631  1260.343
-## 632  1270.266
-## 635  1753.016
-## 636  1046.692
-## 638  1646.559
-## 639  1266.657
-## 640  1128.077
-## 641  1251.679
-## 643  1130.427
-## 644  1295.270
-## 645  1357.888
-## 646  1328.070
-## 647  1173.308
-## 648  1114.454
-## 649  1077.419
-## 650  1313.092
-## 651  1700.937
-## 655  1660.677
-## 656  1027.513
-## 657  1591.894
-## 658  1803.686
-## 659  1193.836
-## 662  1608.599
-## 663   771.797
-## 664  1162.370
-## 665  1398.545
-## 666  1156.718
-## 667  1622.032
-## 668  1315.843
-## 669  1876.028
-## 670  1245.034
-## 671  1646.525
-## 674  1317.687
-## 675  1100.929
-## 676  1370.914
-## 678  1539.429
-## 679  1679.075
-## 683  1425.109
-## 685  1209.622
-## 686  1251.802
-## 688  1531.744
-## 691  1217.127
-## 692  1495.983
-## 693  1539.944
-## 694   921.059
-## 695  2289.889
-## 696  1207.534
-## 697  1182.210
-## 698  1157.771
-## 700  1485.990
-## 701  1434.389
-## 702  1500.251
-## 704  1509.374
-## 706  1162.608
-## 707   987.617
-## 708  1265.032
-## 709  1876.307
-## 710  1316.871
-## 711  1030.757
-## 712  1724.662
-## 713  1214.981
-## 714  1316.398
-## 715  1246.200
-## 717  1399.672
-## 718   940.363
-## 719  1183.981
-## 721  1024.169
-## 723  1549.185
-## 725  1239.314
-## 727  1184.581
-## 728  1385.645
-## 729   936.823
-## 730  1153.618
-## 731  1198.853
-## 732  1140.605
-## 733  1345.687
-## 734  1273.128
-## 735  1217.831
-## 737  1407.401
-## 738   889.743
-## 741  1405.868
-## 742  1484.334
-## 744  1339.098
-## 746  1161.291
-## 747  1526.711
-## 748  1622.580
-## 749  1320.460
-## 750  1258.683
-## 753   919.419
-## 756  1689.585
-## 759  1254.468
-## 760  1393.335
-## 761  1475.658
-## 764  1323.557
-## 766  1418.385
-## 771  1412.020
-## 774  1285.854
-## 775  1205.819
-## 776  1184.156
-## 777  1641.140
-## 778  1628.157
-## 779  1557.606
-## 780  1285.063
-## 781  1085.215
-## 782  1607.527
-## 784  1311.161
-## 787  1521.811
-## 788  1347.989
-## 789  1404.303
-## 791  1267.646
-## 793  1204.623
-## 798  1216.104
-## 799  1027.206
-## 800  1163.021
-## 802  1554.365
-## 803  1182.852
-## 805  1812.569
-## 806  1008.134
-## 807  1553.114
-## 808  1068.727
-## 809  1258.966
-## 810  1298.731
-## 811  1400.524
-## 812  1202.493
-## 813  1942.050
-## 814  1755.968
-## 815  1258.062
-## 817  1015.021
-## 818  1126.518
-## 820  1142.632
-## 821  1548.609
-## 822  1403.043
-## 824  1284.690
-## 826   956.302
-## 827   874.091
-## 828  1063.621
-## 830  1496.062
-## 831  1414.078
-## 835  1538.316
-## 836  1271.343
-## 837  2352.029
-## 838  1512.658
-## 840  1028.839
-## 841   862.001
-## 842  1204.610
-## 843  1310.510
-## 844  1229.910
-## 845  1248.750
-## 846  1560.016
-## 847  1078.409
-## 848  1641.456
-## 849  1191.348
-## 851  1360.497
-## 852  1079.578
-## 855  1147.600
-## 856  1831.909
-## 858  1311.522
-## 859  1034.144
-## 860  1478.596
-## 862   915.130
-## 863  1259.934
-## 864  1105.042
-## 865  1453.895
-## 866  1555.816
-## 867  1853.893
-## 868  1085.157
-## 869  1530.598
-## 870  1205.141
-## 871  1681.985
-## 872  1295.591
-## 873  1022.705
-## 874  1254.755
-## 875  1233.824
-## 876  1230.493
-## 877  1469.764
-## 878  1422.242
-## 881  1947.460
-## 882  1557.266
-## 883  1316.112
-## 885  1319.435
-## 886   927.283
-## 887  1449.803
-## 888  1269.680
-## 890  1175.034
-## 892  1235.078
-## 893  1596.356
-## 894  1682.478
-## 895  1392.653
-## 896  1129.072
-## 898  1292.828
-## 900  1272.862
-## attr(,"assign")
-## [1] 1 2 3 4 5 6 7
-```
-
-```r
 y=train$Class
 ridge=glmnet(X,y,alpha=0)
 #ridge$beta
 plot(ridge,xvar="lambda", label = TRUE) # Extent(4) and Eccentricity (6) are the variables kept
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-14-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-34-1.png)<!-- -->
 
 ```r
 ridge_fitted = predict(ridge, newx = X) # fitted value for the training set using the best lambda value automatically selected by the function
@@ -1813,11 +1032,10 @@ coef(cv.ridge)
 plot(cv.ridge) # cv mse of the ridge
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-14-2.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-34-2.png)<!-- -->
 
 ```r
-cv.ridge_fitted = predict(cv.ridge, newx = X)
-cv.ridge_predicted = predict(cv.ridge, newx = model.matrix(Class~.-1, data = test))
+cv.ridge_predicted = predict(cv.ridge, newx = X)
 mse(ridge_fitted, train, "Class") # training error of the ridge
 ```
 
@@ -1834,28 +1052,11 @@ mse(ridge_predicted, test, "Class") # test error of the ridge
 ```
 
 ```r
-mse(cv.ridge_fitted, train, "Class") # cv test error of the ridge
-```
-
-```
-## [1] 0.1321348
-```
-
-```r
 mse(cv.ridge_predicted, test, "Class") # cv test error of the ridge
 ```
 
 ```
-## [1] 0.1466852
-```
-
-```r
-# Calculate accuracy
-CDP_accuracy(cv.ridge_predicted, test)
-```
-
-```
-## [1] 0.8444444
+## [1] 0.3101069
 ```
 
 ### 5. LASSO
@@ -1868,7 +1069,7 @@ fit.lasso=glmnet(X,y)
 plot(fit.lasso,xvar="lambda",label=TRUE)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-15-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-35-1.png)<!-- -->
 
 ```r
 # Perform cross-validation for lasso regression
@@ -1877,10 +1078,10 @@ cv.lasso=cv.glmnet(X,y)
 plot(cv.lasso)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-15-2.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-35-2.png)<!-- -->
 
 ```r
-coef(cv.lasso) # variables kept are all but Extent
+coef(cv.lasso)
 ```
 
 ```
@@ -1898,30 +1099,10 @@ coef(cv.lasso) # variables kept are all but Extent
 
 ```r
 # Calculate mean squared error for the training data
-cv.lasso_fitted = predict(cv.lasso, newx = X)
-cv.lasso_predicted = predict(cv.lasso, newx = model.matrix(Class~.-1, data = test))
-mse(cv.lasso_fitted, train, "Class") # train error of the lasso
-```
-
-```
-## [1] 0.1246778
-```
-
-```r
-mse(cv.lasso_predicted, test, "Class") # test error of the lasso
-```
-
-```
-## [1] 0.1428101
-```
-
-```r
-# Calculate accuracy
-CDP_accuracy(cv.lasso_predicted, test)
-```
-
-```
-## [1] 0.8555556
+#mse(fit.lasso, raisins, "Class")
+##Predict using the lasso regression model
+#predict(fit.lasso,newx = X)
+#
 ```
 
 ### 6. TREE
@@ -1929,107 +1110,32 @@ CDP_accuracy(cv.lasso_predicted, test)
 
 ```r
 library(tree)
-library(rpart.plot)
-
 # Fit the decision tree model
-treeFit <- tree(Class ~ ., data = train)
-summary(treeFit)
+tree = tree(Class ~ ., data = raisins)
+# Plot the decision tree
+plot(tree)
+text(tree)
 ```
 
-```
-## 
-## Regression tree:
-## tree(formula = Class ~ ., data = train)
-## Variables actually used in tree construction:
-## [1] "MajorAxisLength" "Perimeter"       "Extent"         
-## Number of terminal nodes:  6 
-## Residual mean deviance:  0.08826 = 55.07 / 624 
-## Distribution of residuals:
-##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-## -0.92040 -0.01333  0.03313  0.00000  0.07960  0.98670
-```
+![](presentation_files/figure-html/unnamed-chunk-36-1.png)<!-- -->
 
 ```r
-# Convert the tree object to an rpart object
-treeFit_rpart <- rpart(treeFit)
+tree_test_predictions = predict(tree, newdata = test, type = "tree")
 
-# Plot the decision tree using rpart.plot
-rpart.plot(treeFit_rpart, box.col = c("#DD8D29", "#46ACC8"), shadow.col = "gray")
-```
+# Make predictions on the training data
+tree_predictions = predict(tree, newdata = train[,-8], type = "tree")
 
-![](presentation_files/figure-html/unnamed-chunk-16-1.png)<!-- -->
+# Calculate mean squared error for the test data
+#mse(tree_test_predictions, test, "Class")
 
-
-```r
-raisins_shb = read.csv(
-  "https://raw.githubusercontent.com/LeonardoAcquaroli/raisins_and_mushrooms/main/datasets/Raisin_Dataset.csv",
-  sep = ";", stringsAsFactors = TRUE, header = TRUE)
-
-# remove the Class column  
-raisins_shb <- raisins_shb[,-9] 
-colnames(raisins_shb)
-```
-
-```
-## [1] "Area"            "MajorAxisLength" "MinorAxisLength" "Eccentricity"   
-## [5] "ConvexArea"      "Extent"          "Perimeter"       "Class_literal"
-```
-
-```r
-set.seed(42)
-training_index_shb = createDataPartition(raisins_shb$Class_literal, p=0.7, list = FALSE) # index of the train set examples
-train_shb = raisins_shb[training_index_shb,]
-test_shb = raisins_shb[-training_index_shb,]
-
-treeFit_rpart_shb <- rpart(formula = Class_literal  ~ . , data = train_shb)
-
-# Plot the decision tree using rpart.plot
-rpart.plot(treeFit_rpart_shb, box.col = c("#DD8D29", "#46ACC8"), shadow.col = "gray")
-```
-
-![](presentation_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
-
-
-```r
-#training prediction
-tree_fitted <- predict(treeFit, newdata = train)
-
-#test predictions
-tree_predicted <- predict(treeFit, newdata = test)
-
-mse(tree_fitted, train, "Class") # training error of the train
-```
-
-```
-## [1] 0.08741554
-```
-
-```r
-mse(tree_predicted, test, "Class") # test error of the test
-```
-
-```
-## [1] 0.1213496
-```
-
-```r
-# Calculate accuracy
-CDP_accuracy(tree_predicted, test)
-```
-
-```
-## [1] 0.8555556
-```
-
-```r
-# This approach leads to correct predictions for around 85.55% of the raisins in the test data set.
-# The best results achieved in the paper were 86.44% with a SVM
+#plot carino
+#valutarlo : prendere predizioni e calcolare mse su training e test
+#confusion matrix
 ```
 
 ### 7. KNN
 
-
-```r
+```
 # Scaling
 train.array <- scale(train[, 1:7])
 test.array<- scale(test[, 1:7])
@@ -2057,25 +1163,9 @@ best_k <- k_values[which.max(accuracy_scores)]
 
 #print(paste("Accuracy scores:", accuracy_scores))
 print(paste("Best K value:", best_k))
-```
 
-```
-## [1] "Best K value: 5"
-```
-
-```r
 #Data frame with K values and accuracy
 k_values_results <- data.frame(K = k_values, Accuracy = accuracy_scores)
-Knn_accuracy =  k_values_results[which.max(k_values_results$Accuracy),]
-Knn_accuracy
-```
-
-```
-##   K  Accuracy
-## 5 5 0.8407407
-```
-
-```r
 # Plot
 ggplot(k_values_results, aes(x = K, y = 1 - Accuracy)) +
   geom_line() +
@@ -2084,45 +1174,6 @@ ggplot(k_values_results, aes(x = K, y = 1 - Accuracy)) +
   ggtitle("Test Error vs K") +
   theme_minimal()
 ```
-
-![](presentation_files/figure-html/unnamed-chunk-19-1.png)<!-- -->
-
-# Predictive power table
-
-
-```r
-mse_list = c(mse(ols_test_predictions,test, "Class"),
-             mse(ols_robust_test_predictions,test, "Class"),
-             mse(logistic_test_predictions, test, "Class"),
-             mse(cv.ridge_predicted, test, "Class"),
-             mse(cv.lasso_predicted, test, "Class"),
-             mse(tree_predicted, test, "Class"),
-             NA)
-accuracy_list = c(CDP_accuracy(ols_test_predictions, test),
-                  CDP_accuracy(ols_robust_test_predictions, test),
-                  CDP_accuracy(logistic_test_predictions, test),
-                  CDP_accuracy(cv.ridge_predicted, test),
-                  CDP_accuracy(cv.lasso_predicted, test),
-                  CDP_accuracy(tree_predicted, test),
-                  Knn_accuracy$Accuracy)
-
-sumupDF = data.frame(Test_mse = mse_list, Accuracy = accuracy_list,
-                     row.names = c("OLS", "Robust OLS", "Logistic", "Ridge", "Lasso", "Tree", "K-NN"))
-sumupDF
-```
-
-```
-##              Test_mse  Accuracy
-## OLS         0.1346953 0.8555556
-## Robust OLS  0.1356805 0.8481481
-## Logistic   37.4428017 0.8740741
-## Ridge       0.1466852 0.8444444
-## Lasso       0.1428101 0.8555556
-## Tree        0.1213496 0.8555556
-## K-NN               NA 0.8407407
-```
-
-Our logistic model actually beats the SVM approach that achieved the best performance in the paper.
 
 # Unsupervised models
 
@@ -2219,18 +1270,21 @@ summary(pr.out)
 ```
 
 
+
+
 ```r
 fviz_eig(pr.out, addlabels = TRUE, ylim = c(0, 70), main = "Scree Plot of PCA")
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-43-1.png)<!-- -->
 
 ```r
 fviz_pca_var(pr.out, col.var = "blue", col.quanti.sup = "red", 
              addlabels = TRUE, repel = TRUE)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-26-2.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-43-2.png)<!-- -->
+
 
 
 ```r
@@ -2240,7 +1294,7 @@ arrows(0, 0, pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, length = 0.1, angle
 text(pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, labels = rownames(pr.out[[2]]), pos = 3)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-44-1.png)<!-- -->
 
 
 ```r
@@ -2323,15 +1377,7 @@ km.out
 ## [6] "betweenss"    "size"         "iter"         "ifault"
 ```
 
-
-```r
-#Since clusters do not correspond to a specific category, we cannot estimate accuracy. 
-#However, distribution should be 450-450, but it is 189-711, so the algorithm is clearly not adequate for this dataset.
-plot (df, col = adjustcolor(km.out$cluster + 1, alpha.f = 0.1),
-main = "K- Means Clustering Results with K = 2", pch = 20)
-```
-
-![](presentation_files/figure-html/unnamed-chunk-30-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-47-1.png)<!-- -->
 
 ### 3. Clustering su PCA
 
@@ -2390,12 +1436,4 @@ km.out2
 ## [6] "betweenss"    "size"         "iter"         "ifault"
 ```
 
-
-```r
-#Graphical representation of the clusters. 
-#Results are slightly better on PC than on initial features
-plot (pcadf, col = adjustcolor(km.out2$cluster + 1, alpha.f = 0.5),
-main = "K- Means Clustering Results with K = 2", pch = 20)
-```
-
-![](presentation_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-49-1.png)<!-- -->
