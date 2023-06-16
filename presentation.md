@@ -1645,7 +1645,7 @@ summary(df)
 
 
 ```r
-#correlazione di ogni variabile con ogni componente
+#correlation between variables and components
 pr.out = prcomp(df, scale = TRUE)
 pr.out
 ```
@@ -1734,7 +1734,7 @@ head(pcadf)
 ## [6,] -0.008369549
 ```
 
-### 2.Clustering su tutte le variabili
+### 2.Clustering on predictors
 
 
 ```r
@@ -1801,7 +1801,7 @@ main = "K- Means Clustering Results with K = 2", pch = 20)
 
 ![](presentation_files/figure-html/unnamed-chunk-51-1.png)<!-- -->
 
-### 3. Clustering su PCA
+### 3. Clustering on PCA
 
 
 ```r
