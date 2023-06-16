@@ -64,7 +64,7 @@ library(bestglm) # best subset for logistic
 library(MASS)    # diagnostics
 library(olsrr)   # diagnostics
 library(influence.ME)
-library(DHARMa)
+library(DHARMa) #logit diagnostics
 ```
 
 #### Loading data-set
@@ -187,16 +187,15 @@ ols <- lm("Class ~ .",data=raisins)
 summary(ols)
 ```
 
-#### We check for heteroscedasticity and multicollinearity
+#### We check for multicollinearity
 
 ```{r}
-check_heteroscedasticity(ols) # there is heteroskedasticity
 check_model(ols)
 vif(ols)
 sqrt(vif(ols)) > 2
 ```
 
-#### There appears to be heteroscedacity, plus the multicollinearity is extremely high
+#### Multicollinearity is extremely high
 
 #### We try to tackle multicollinearity by reducing the variables in the model. We use best subset selection.
 
@@ -308,23 +307,6 @@ accuracy_ols_fulld <- 776/900
 accuracy_ols_fulld
 ```
 
-#### Given that we found heteroscedasticity, we perform the same model with the robust option.
-
-```{r}
-#ROBUST OLS
-ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
-summary(ols_robust)
-```
-
-#### We compute the accuracy as we did before
-
-```{r}
-fitvolsrob_fulld = predict(ols_robust, raisins) # fulld identifies the full dataset
-predolsrob_fulld = ifelse(fitvolsrob_fulld < 0.50, 0, 1)
-accolsrob_fulld = raisins$Class == predolsrob_fulld
-table(accolsrob_fulld)
-accuracy_olsrob_fulld <- 776/900
-accuracy_olsrob_fulld
 
 ```
 
@@ -334,7 +316,7 @@ accuracy_olsrob_fulld
 raisins_noout <- raisins[!(row.names(raisins) %in% c(695, 507, 837, 291, 86, 488)), ]
 ```
 
-#### First the "normal" model
+#### We run the linear probability model again
 
 ```{r}
 ols_imp2_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no outliers
@@ -345,19 +327,6 @@ accols_fulld_n = raisins_noout$Class == predols_fulld_n
 table(accols_fulld_n)
 accuracy_ols_fulld_n <- 772/894
 accuracy_ols_fulld_n
-```
-
-#### Then the robust one
-
-```{r}
-ols_rob_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no-outliers
-summary(ols_rob_n)
-fitvolsrob_fulld_n = predict(ols_rob_n, raisins_noout) # fulld identifies the full dataset
-predolsrob_fulld_n = ifelse(fitvolsrob_fulld_n < 0.50, 0, 1)
-accolsrob_fulld_n = raisins_noout$Class == predolsrob_fulld_n
-table(accolsrob_fulld_n)
-accuracy_olsrob_fulld_n <- 772/894
-accuracy_olsrob_fulld_n
 ```
 
 ### We now move to logistic regression
@@ -403,8 +372,7 @@ models <- list(logistic = logistic_model,
                imp_logistic = imp_logistic_model,
                minimal_logit_extent = minimal1_logistic_model,
                minimal_logit_perimeter = minimal2_logistic_model,
-               lpm = ols_imp2,
-               lpm_rob = ols_robust)
+               lpm = ols_imp2)
 
 for (model_name in names(models)) {
   model <- models[[model_name]]
@@ -428,33 +396,21 @@ accuracies
 
 #### Since the minimal logisitc model with the perimeter is the best one, we compute diagnostics on it.
 
-```{r}
-predicted_probs_logit <- predict(minimal2_logistic_model, type = "response")
-residuals_logit <- raisins$Class - predicted_probs_logit
-
-plot(predicted_probs_logit, raisins$Class, xlab = "Predicted Probabilities", ylab = "Observed Responses",
-     main = "Observed vs. Predicted Probabilities", pch = 16)
-
-#check relations with each predictor
-plot(raisins$Eccentricity, residuals_logit, xlab = "Eccentricity", ylab = "Standardized Residuals",
-     main = "Standardized Residuals vs. Predictor 1", pch = 16)
-plot(raisins$Perimeter, residuals_logit, xlab = "Perimeter", ylab = "Standardized Residuals",
-     main = "Standardized Residuals vs. Predictor 1", pch = 16)
-
 # Diagnostics with DHARMa
 
+```{r}
 # Create a simulated residuals object
 simulated_residuals <- simulateResiduals(minimal2_logistic_model, n = 100)
 # Plot standardized residuals using DHARMa's built-in diagnostic plots
 plot(simulated_residuals)
+```
 ```
 
 ### Comparison of all the models so far
 
 ```{r}
 # Compare all the models
-compare_performance(ols_imp2, ols_robust, minimal2_logistic_model)
-plot(compare_performance(ols_imp2, minimal2_logistic_model, rank = TRUE, verbose = FALSE))
+compare_performance(ols_imp2, minimal2_logistic_model)
 
 accuracies
 ```
@@ -584,7 +540,7 @@ ridge=glmnet(X,y,alpha=0)
 #ridge$beta
 plot(ridge,xvar="lambda", label = TRUE) # Extent(4) and Eccentricity (6) are the variables kept
 ridge_fitted = predict(ridge, newx = X) # fitted value for the training set using the best lambda value automatically selected by the function
-ridge_predicted = predict(ridge, newx = model.matrix(Class~.-1, data = test)) # fitted value for the training set using the best lambda value automatically selected by the function
+ridge_predicted = predict(ridge, newx = model.matrix(Class~.-1, data = test)) # fitted value for the test set using the best lambda value automatically selected by the function
 cv.ridge=cv.glmnet(X,y,alpha=0)
 coef(cv.ridge)
 plot(cv.ridge) # cv mse of the ridge

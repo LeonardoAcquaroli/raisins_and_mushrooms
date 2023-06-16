@@ -63,7 +63,7 @@ library(bestglm) # best subset for logistic
 library(MASS)    # diagnostics
 library(olsrr)   # diagnostics
 library(influence.ME)
-library(DHARMa)
+library(DHARMa) #logit diagnostics
 ```
 
 #### Loading data-set
@@ -302,16 +302,8 @@ summary(ols)
 ## F-statistic: 133.8 on 7 and 892 DF,  p-value: < 2.2e-16
 ```
 
-#### We check for heteroscedasticity and multicollinearity
+#### We check for multicollinearity
 
-
-```r
-check_heteroscedasticity(ols) # there is heteroskedasticity
-```
-
-```
-## Warning: Heteroscedasticity (non-constant error variance) detected (p = 0.040).
-```
 
 ```r
 check_model(ols)
@@ -341,7 +333,7 @@ sqrt(vif(ols)) > 2
 ##           FALSE            TRUE
 ```
 
-#### There appears to be heteroscedacity, plus the multicollinearity is extremely high
+#### Multicollinearity is extremely high
 
 #### We try to tackle multicollinearity by reducing the variables in the model. We use best subset selection.
 
@@ -570,56 +562,7 @@ accuracy_ols_fulld
 ## [1] 0.8622222
 ```
 
-#### Given that we found heteroscedasticity, we perform the same model with the robust option.
 
-
-```r
-#ROBUST OLS
-ols_robust <- lm_robust(Class ~ Eccentricity + Perimeter , data = raisins, se_type = "HC2")
-summary(ols_robust)
-```
-
-```
-## 
-## Call:
-## lm_robust(formula = Class ~ Eccentricity + Perimeter, data = raisins, 
-##     se_type = "HC2")
-## 
-## Standard error type:  HC2 
-## 
-## Coefficients:
-##               Estimate Std. Error t value   Pr(>|t|)  CI Lower   CI Upper  DF
-## (Intercept)   2.510968  1.002e-01  25.069 1.541e-105  2.314392  2.7075452 897
-## Eccentricity -0.971708  1.367e-01  -7.108  2.403e-12 -1.240012 -0.7034040 897
-## Perimeter    -0.001073  6.693e-05 -16.039  4.297e-51 -0.001205 -0.0009421 897
-## 
-## Multiple R-squared:  0.4681 ,	Adjusted R-squared:  0.4669 
-## F-statistic: 251.8 on 2 and 897 DF,  p-value: < 2.2e-16
-```
-
-#### We compute the accuracy as we did before
-
-
-```r
-fitvolsrob_fulld = predict(ols_robust, raisins) # fulld identifies the full dataset
-predolsrob_fulld = ifelse(fitvolsrob_fulld < 0.50, 0, 1)
-accolsrob_fulld = raisins$Class == predolsrob_fulld
-table(accolsrob_fulld)
-```
-
-```
-## accolsrob_fulld
-## FALSE  TRUE 
-##   124   776
-```
-
-```r
-accuracy_olsrob_fulld <- 776/900
-accuracy_olsrob_fulld
-```
-
-```
-## [1] 0.8622222
 ```
 
 #### We now remove the "outliers" from the dataset and preform the very same models.
@@ -629,7 +572,7 @@ accuracy_olsrob_fulld
 raisins_noout <- raisins[!(row.names(raisins) %in% c(695, 507, 837, 291, 86, 488)), ]
 ```
 
-#### First the "normal" model
+#### We run the linear probability model again
 
 
 ```r
@@ -681,58 +624,6 @@ accuracy_ols_fulld_n
 ## [1] 0.8635347
 ```
 
-#### Then the robust one
-
-
-```r
-ols_rob_n <- lm("Class ~ Eccentricity + Perimeter",data=raisins_noout) # _n identifies no-outliers
-summary(ols_rob_n)
-```
-
-```
-## 
-## Call:
-## lm(formula = "Class ~ Eccentricity + Perimeter", data = raisins_noout)
-## 
-## Residuals:
-##      Min       1Q   Median       3Q      Max 
-## -1.06624 -0.28222  0.05692  0.27255  0.76195 
-## 
-## Coefficients:
-##                Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   2.6476056  0.1026150  25.801  < 2e-16 ***
-## Eccentricity -0.9332612  0.1442159  -6.471  1.6e-10 ***
-## Perimeter    -0.0012245  0.0000504 -24.296  < 2e-16 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-## 
-## Residual standard error: 0.3489 on 891 degrees of freedom
-## Multiple R-squared:  0.5147,	Adjusted R-squared:  0.5136 
-## F-statistic: 472.5 on 2 and 891 DF,  p-value: < 2.2e-16
-```
-
-```r
-fitvolsrob_fulld_n = predict(ols_rob_n, raisins_noout) # fulld identifies the full dataset
-predolsrob_fulld_n = ifelse(fitvolsrob_fulld_n < 0.50, 0, 1)
-accolsrob_fulld_n = raisins_noout$Class == predolsrob_fulld_n
-table(accolsrob_fulld_n)
-```
-
-```
-## accolsrob_fulld_n
-## FALSE  TRUE 
-##   122   772
-```
-
-```r
-accuracy_olsrob_fulld_n <- 772/894
-accuracy_olsrob_fulld_n
-```
-
-```
-## [1] 0.8635347
-```
-
 ### We now move to logistic regression
 
 
@@ -770,7 +661,7 @@ vif(logistic_model)
 hist(fitted(logistic_model))
 ```
 
-<img src="presentation_files/figure-html/unnamed-chunk-22-1.png" style="display: block; margin: auto;" />
+<img src="presentation_files/figure-html/unnamed-chunk-19-1.png" style="display: block; margin: auto;" />
 
 #### We perform best subset selection on the logistic model as well
 
@@ -840,8 +731,7 @@ models <- list(logistic = logistic_model,
                imp_logistic = imp_logistic_model,
                minimal_logit_extent = minimal1_logistic_model,
                minimal_logit_perimeter = minimal2_logistic_model,
-               lpm = ols_imp2,
-               lpm_rob = ols_robust)
+               lpm = ols_imp2)
 
 for (model_name in names(models)) {
   model <- models[[model_name]]
@@ -870,71 +760,39 @@ accuracies
 ## 3    minimal_logit_extent 70.77778
 ## 4 minimal_logit_perimeter 86.44444
 ## 5                     lpm 86.22222
-## 6                 lpm_rob 86.22222
 ```
 
 #### Since the minimal logisitc model with the perimeter is the best one, we compute diagnostics on it.
 
-
-```r
-predicted_probs_logit <- predict(minimal2_logistic_model, type = "response")
-residuals_logit <- raisins$Class - predicted_probs_logit
-
-plot(predicted_probs_logit, raisins$Class, xlab = "Predicted Probabilities", ylab = "Observed Responses",
-     main = "Observed vs. Predicted Probabilities", pch = 16)
-```
-
-![](presentation_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
-
-```r
-#check relations with each predictor
-plot(raisins$Eccentricity, residuals_logit, xlab = "Eccentricity", ylab = "Standardized Residuals",
-     main = "Standardized Residuals vs. Predictor 1", pch = 16)
-```
-
-![](presentation_files/figure-html/unnamed-chunk-26-2.png)<!-- -->
-
-```r
-plot(raisins$Perimeter, residuals_logit, xlab = "Perimeter", ylab = "Standardized Residuals",
-     main = "Standardized Residuals vs. Predictor 1", pch = 16)
-```
-
-![](presentation_files/figure-html/unnamed-chunk-26-3.png)<!-- -->
-
-```r
 # Diagnostics with DHARMa
 
+
+```r
 # Create a simulated residuals object
 simulated_residuals <- simulateResiduals(minimal2_logistic_model, n = 100)
 # Plot standardized residuals using DHARMa's built-in diagnostic plots
 plot(simulated_residuals)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-26-4.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-23-1.png)<!-- -->
+```
 
 ### Comparison of all the models so far
 
 
 ```r
 # Compare all the models
-compare_performance(ols_imp2, ols_robust, minimal2_logistic_model)
+compare_performance(ols_imp2, minimal2_logistic_model)
 ```
 
 ```
 ## # Comparison of Model Performance Indices
 ## 
-## Name                    |     Model | AIC (weights) | AICc (weights) | BIC (weights) |  RMSE | Sigma |    R2 | R2 (adj.) | Tjur's R2 | Log_loss | Score_log | Score_spherical |   PCP
-## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-## ols_imp2                |        lm | 746.2 (<.001) |  746.2 (<.001) | 765.4 (<.001) | 0.365 | 0.365 | 0.468 |     0.467 |           |          |           |                 |      
-## ols_robust              | lm_robust | 746.2 (<.001) |  746.2 (<.001) | 765.4 (<.001) | 0.365 | 0.365 | 0.468 |     0.467 |           |          |           |                 |      
-## minimal2_logistic_model |       glm | 636.2 (>.999) |  636.3 (>.999) | 650.6 (>.999) | 0.320 | 0.838 |       |           |     0.574 |    0.350 |      -Inf |           0.008 | 0.787
+## Name                    | Model | AIC (weights) | AICc (weights) | BIC (weights) |  RMSE | Sigma |    R2 | R2 (adj.) | Tjur's R2 | Log_loss | Score_log | Score_spherical |   PCP
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ols_imp2                |    lm | 746.2 (<.001) |  746.2 (<.001) | 765.4 (<.001) | 0.365 | 0.365 | 0.468 |     0.467 |           |          |           |                 |      
+## minimal2_logistic_model |   glm | 636.2 (>.999) |  636.3 (>.999) | 650.6 (>.999) | 0.320 | 0.838 |       |           |     0.574 |    0.350 |      -Inf |           0.008 | 0.787
 ```
-
-```r
-plot(compare_performance(ols_imp2, minimal2_logistic_model, rank = TRUE, verbose = FALSE))
-```
-
-![](presentation_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
 
 ```r
 accuracies
@@ -947,7 +805,6 @@ accuracies
 ## 3    minimal_logit_extent 70.77778
 ## 4 minimal_logit_perimeter 86.44444
 ## 5                     lpm 86.22222
-## 6                 lpm_rob 86.22222
 ```
 
 ## We now performe some actual statistical learning
@@ -1034,7 +891,7 @@ ols_test_predictions = predict.lm(ols,newdata = test)
 hist(fitted(ols))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-29-1.png)<!-- -->
 
 ```r
 # Calculate MSE for the training data
@@ -1107,7 +964,7 @@ ols_robust_test_predictions = predict(ols_robust, newdata = test)
 hist(fitted(ols_robust))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-30-1.png)<!-- -->
 
 ```r
 # Calculate MSE for the training data
@@ -1165,7 +1022,7 @@ tidy(logistic)
 hist(fitted(logistic))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-34-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-31-1.png)<!-- -->
 
 ```r
 #logistic by hand
@@ -1212,7 +1069,7 @@ tidy(logistic_ad)
 hist(fitted(logistic_ad))
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-34-2.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-31-2.png)<!-- -->
 
 ```r
 #logistic by hand
@@ -1252,11 +1109,11 @@ ridge=glmnet(X,y,alpha=0)
 plot(ridge,xvar="lambda", label = TRUE) # Extent(4) and Eccentricity (6) are the variables kept
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-35-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
 
 ```r
 ridge_fitted = predict(ridge, newx = X) # fitted value for the training set using the best lambda value automatically selected by the function
-ridge_predicted = predict(ridge, newx = model.matrix(Class~.-1, data = test)) # fitted value for the training set using the best lambda value automatically selected by the function
+ridge_predicted = predict(ridge, newx = model.matrix(Class~.-1, data = test)) # fitted value for the test set using the best lambda value automatically selected by the function
 cv.ridge=cv.glmnet(X,y,alpha=0)
 coef(cv.ridge)
 ```
@@ -1278,7 +1135,7 @@ coef(cv.ridge)
 plot(cv.ridge) # cv mse of the ridge
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-35-2.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-32-2.png)<!-- -->
 
 ```r
 cv.ridge_fitted = predict(cv.ridge, newx = X)
@@ -1333,7 +1190,7 @@ fit.lasso=glmnet(X,y)
 plot(fit.lasso,xvar="lambda",label=TRUE)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-36-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
 
 ```r
 # Perform cross-validation for lasso regression
@@ -1342,7 +1199,7 @@ cv.lasso=cv.glmnet(X,y)
 plot(cv.lasso)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-36-2.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-33-2.png)<!-- -->
 
 ```r
 coef(cv.lasso) # variables kept are all but Extent
@@ -1422,7 +1279,7 @@ treeFit_rpart <- rpart(treeFit)
 rpart.plot(treeFit_rpart, box.col = c("#DD8D29", "#46ACC8"), shadow.col = "gray")
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-37-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-34-1.png)<!-- -->
 
 
 ```r
@@ -1452,7 +1309,7 @@ treeFit_rpart_shb <- rpart(formula = Class_literal  ~ . , data = train_shb)
 rpart.plot(treeFit_rpart_shb, box.col = c("#DD8D29", "#46ACC8"), shadow.col = "gray")
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-38-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-35-1.png)<!-- -->
 
 
 ```r
@@ -1550,7 +1407,7 @@ ggplot(k_values_results, aes(x = K, y = 1 - Accuracy)) +
   theme_minimal()
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-40-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-37-1.png)<!-- -->
 
 # Predictive power table
 
@@ -1691,14 +1548,14 @@ summary(pr.out)
 fviz_eig(pr.out, addlabels = TRUE, ylim = c(0, 70), main = "Scree Plot of PCA")
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-47-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-44-1.png)<!-- -->
 
 ```r
 fviz_pca_var(pr.out, col.var = "blue", col.quanti.sup = "red", 
              addlabels = TRUE, repel = TRUE)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-47-2.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-44-2.png)<!-- -->
 
 
 ```r
@@ -1708,7 +1565,7 @@ arrows(0, 0, pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, length = 0.1, angle
 text(pr.out$rotation[, 1]*7, pr.out$rotation[, 2]*7, labels = rownames(pr.out[[2]]), pos = 3)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-48-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-45-1.png)<!-- -->
 
 
 ```r
@@ -1799,7 +1656,7 @@ plot (df, col = adjustcolor(km.out$cluster + 1, alpha.f = 0.1),
 main = "K- Means Clustering Results with K = 2", pch = 20)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-51-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-48-1.png)<!-- -->
 
 ### 3. Clustering su PCA
 
@@ -1866,4 +1723,4 @@ plot (pcadf, col = adjustcolor(km.out2$cluster + 1, alpha.f = 0.5),
 main = "K- Means Clustering Results with K = 2", pch = 20)
 ```
 
-![](presentation_files/figure-html/unnamed-chunk-53-1.png)<!-- -->
+![](presentation_files/figure-html/unnamed-chunk-50-1.png)<!-- -->
