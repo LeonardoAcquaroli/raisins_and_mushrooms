@@ -722,7 +722,7 @@ summary(df)
 ```
 
 ```{r}
-#correlazione di ogni variabile con ogni componente
+#correlation between variables and components
 pr.out = prcomp(df, scale = TRUE)
 pr.out
 ```
@@ -750,7 +750,7 @@ pcadf <- predict(pr.out, newdata = df)
 head(pcadf)
 ```
 
-### 2.Clustering su tutte le variabili
+### 2.Clustering on predictors
 
 ```{r}
 km.out = kmeans(df, 2)
@@ -765,7 +765,7 @@ plot (df, col = adjustcolor(km.out$cluster + 1, alpha.f = 0.1),
 main = "K- Means Clustering Results with K = 2", pch = 20)
 ```
 
-### 3. Clustering su PCA
+### 3. Clustering on PCA
 
 ```{r}
 
